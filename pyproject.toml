@@ -1,0 +1,44 @@
+
+[build-system]
+requires = ["setuptools>=69", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "sep-agents"
+version = "0.0.1"
+description = "LLM-guided, physics-grounded multi-agent system for mineral & metal separation flowsheets"
+authors = [{name="Your Name"}]
+readme = "README.md"
+requires-python = ">=3.10"
+dependencies = [
+  "pydantic>=2.6",
+  "numpy>=1.26",
+  "pandas>=2.2",
+  "networkx>=3.2",
+  "pyyaml>=6.0",
+  "scipy>=1.12",
+  "optuna>=3.6",
+  "gpytorch>=1.11; python_version >= '3.10'",
+  "botorch>=0.10; python_version >= '3.10'",
+  "torch>=2.2; python_version >= '3.10'",
+  "mlflow>=2.13",
+  "plotly>=5.22",
+  "rich>=13.7",
+  "typer>=0.12",
+  "uvicorn>=0.30",
+  "fastapi>=0.111",
+  "ray[default]>=2.9",
+  "dask[complete]>=2024.8.0",
+  "neo4j>=5.20",
+  "chromadb>=0.5.5",
+  "pyomo>=6.7",
+  "idaes-pse>=2.7; python_version >= '3.10'",
+  # Reaktoro often installed separately; keep optional in extras
+]
+
+[project.optional-dependencies]
+thermo = ["reaktoro>=2.1"]
+dev = ["pytest>=8.2", "pytest-cov>=5.0", "ruff>=0.5"]
+
+[tool.ruff]
+line-length = 100

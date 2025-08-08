@@ -1,0 +1,25 @@
+
+name: steel_slag_minimal
+streams:
+  - name: feed
+    phase: solid
+    composition_wt: {Fe2O3: 0.3, CaO: 0.4, SiO2: 0.2, MgO: 0.1}
+    psd:
+      bins_um: [500, 250, 125, 63, 32]
+      mass_frac: [0.1, 0.2, 0.3, 0.25, 0.15]
+units:
+  - id: mill_1
+    type: mill
+    params: {fineness_factor: 0.7, E_specific_kWhpt: 8.0}
+    inputs: [feed]
+    outputs: [mill_product]
+  - id: cyclone_1
+    type: cyclone
+    params: {underflow_split: 0.6}
+    inputs: [mill_product]
+    outputs: [uf, of]
+  - id: lims_1
+    type: lims
+    params: {mag_recovery: 0.8}
+    inputs: [uf]
+    outputs: [conc, tails]
