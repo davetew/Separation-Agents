@@ -43,6 +43,33 @@ examples/
 scripts/
 tests/
 ```
+## MCP server (experimental)
+
+This repo includes an **MCP server** under `mcp_server/` that exposes tools:
+
+- `simulate_flowsheet` – run an IDAES-backed sim and return KPIs
+- `run_speciation` – Reaktoro speciation for a stream
+- `estimate_cost` – TEA/LCA stubs
+- `optimize_flowsheet` – propose param edits (placeholder)
+
+### Run locally (stdio)
+
+# Activate your env
+conda activate sep-agents   # or: source .venv/bin/activate
+
+# Install the package (and dev tools)
+python -m pip install -e ".[dev]"
+
+# Optional: install Reaktoro for speciation
+#   conda install -c conda-forge reaktoro
+# or
+#   python -m pip install ".[thermo]"
+
+# Install an MCP SDK (adjust to your chosen implementation)
+python -m pip install mcp
+
+# Start the MCP server (stdio transport)
+python mcp_server/server.py
 
 ## What’s next
 - Wire your **MCP** planner to call: flowsheet_synthesizer, simulator, optimizer.

@@ -15,6 +15,6 @@ class Mill(BaseUnit):
         factor = self.params.get("fineness_factor", 0.7)  # <1 makes finer
         new_bins = bins * factor
         new_psd = PSD(bins_um=new_bins.tolist(), mass_frac=mf.tolist())
-        prod = feed.copy(update={"psd": new_psd})
+        prod = feed.model_copy(update={"psd": new_psd})
         e = float(self.params.get("E_specific_kWhpt", 8.0))
         return UnitResult(outputs={"product": prod}, kpis={"E_specific_kWhpt": e})

@@ -1,44 +1,43 @@
-import asyncio
-try:
-    # Replace with your MCP SDK import. This is a placeholder import.
-    from mcp.server import Server
-except Exception as e:
-    raise RuntimeError(
-        "MCP server SDK not installed. Install an MCP SDK (e.g., `pip install mcp`) "
-        "or adjust imports to your chosen MCP library."
-    ) from e
+# mcp_server/server.py
+from mcp.server.fastmcp import FastMCP
 
-from capabilities.simulate_flowsheet import simulate_flowsheet
-from capabilities.run_speciation import run_speciation
-from capabilities.estimate_cost import estimate_cost
-from capabilities.optimize_flowsheet import optimize_flowsheet
+mcp = FastMCP("MineralSeparationMCP")
 
-server = Server(name="MineralSeparationMCP", version="0.1.0")
+# Tools
+@mcp.tool()
+def simulate_flowsheet(flowsheet_yaml: str) -> dict:
+    from sep_agents.orchestrator.planner import load_flowsheet, Orchestrator
+    import tempfile, pathlib
+    p = pathlib.Path(tempfile.mkstemp(suffix=".yaml")[1])
+    p.write_text(flowsheet_yaml)
+    fs = load_flowsheet(str(p))
+    return Orchestrator().run_once(fs)
 
-server.register_tool(
-    name="simulate_flowsheet",
-    description="Run a mineral separation flowsheet in IDAES and return KPIs.",
-    handler=simulate_flowsheet
-)
+@mcp.tool()
+def run_speciation(stream: dict) -> dict:
+    try:
+        import reaktoro  # optional
+    except ImportError:
+        return {"status": "error", "error": "Reaktoro not installed"}
+    from sep_agents.dsl.schemas import Stream
+    s = Stream(**stream)
+    # TODO: Reaktoro call
+    return {"status": "ok", "stream_out": s.dict()}
 
-server.register_tool(
-    name="run_speciation",
-    description="Run thermodynamic speciation using Reaktoro for a given stream.",
-    handler=run_speciation
-)
+@mcp.tool()
+def estimate_cost(kpis: dict) -> dict:
+    from sep_agents.cost.tea import estimate_opex_kwh_reagents
+    from sep_agents.cost.lca import estimate_co2e
+    return {"status": "ok", "OPEX": estimate_opex_kwh_reagents(kpis), "CO2e": estimate_co2e(kpis)}
 
-server.register_tool(
-    name="estimate_cost",
-    description="Estimate TEA/LCA costs for a flowsheet simulation result.",
-    handler=estimate_cost
-)
-
-server.register_tool(
-    name="optimize_flowsheet",
-    description="Run a BoTorch (or simple) optimization on a flowsheet design.",
-    handler=optimize_flowsheet
-)
+@mcp.tool()
+def optimize_flowsheet(flowsheet: dict) -> dict:
+    from sep_agents.opt.bo import SimpleOptimizer
+    from sep_agents.dsl.schemas import Flowsheet
+    fs = Flowsheet(**flowsheet)
+    if fs.units:
+        fs.units[0].params = SimpleOptimizer().suggest_edit(fs.units[0].params)
+    return {"status": "ok", "flowsheet": fs.dict()}
 
 if __name__ == "__main__":
-    # stdio is convenient for local MCP clients (including ChatGPT MCP)
-    asyncio.run(server.serve_stdio())
+    mcp.run()  # stdio by default; see docs for other transports

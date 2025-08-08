@@ -1,7 +1,7 @@
 
 from __future__ import annotations
 from typing import List, Dict, Optional, Literal
-from pydantic import BaseModel, Field, validator
+from pydantic import BaseModel, Field, field_validator
 import networkx as nx
 
 Phase = Literal["solid", "liquid", "gas"]
@@ -10,7 +10,7 @@ class PSD(BaseModel):
     bins_um: List[float] = Field(..., description="Upper size in microns for each bin")
     mass_frac: List[float] = Field(..., description="Mass fraction per bin (sum ~ 1.0)")
 
-    @validator("mass_frac")
+    @field_validator("mass_frac") # Updated to field_validator from validator by DET due to Pydantic v2 changes
     def _sum_to_one(cls, v):
         s = sum(v)
         if not (0.99 <= s <= 1.01):
