@@ -1,9 +1,5 @@
 {
-  "python-envs.pythonProjects": [
-    {
-      "path": "",
-      "envManager": "ms-python.python:conda",
-      "packageManager": "ms-python.python:conda"
-    }
-  ]
+  "jupyter.jupyterServerType": "local",
+  "python.defaultInterpreterPath": "/Users/davidtew/anaconda3/envs/rkt/bin/python",
+  "jupyter.notebookFileRoot": "${workspaceFolder}"
 }
