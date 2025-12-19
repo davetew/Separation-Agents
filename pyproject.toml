@@ -7,7 +7,7 @@ build-backend = "setuptools.build_meta"
 name = "sep-agents"
 version = "0.0.1"
 description = "LLM-guided, physics-grounded multi-agent system for mineral & metal separation flowsheets"
-authors = [{name="Your Name"}]
+authors = [{name="David Tew"}]
 readme = "README.md"
 requires-python = ">=3.10"
 dependencies = [
@@ -33,11 +33,11 @@ dependencies = [
   "chromadb>=0.5.5",
   "pyomo>=6.7",
   "idaes-pse>=2.7; python_version >= '3.10'",
-  # Reaktoro often installed separately; keep optional in extras
+  "reaktoro>=2.1",
+  "GeoH2",
 ]
 
 [project.optional-dependencies]
-thermo = ["reaktoro>=2.1"]
 dev = ["pytest>=8.2", "pytest-cov>=5.0", "ruff>=0.5"]
 
 [tool.ruff]
