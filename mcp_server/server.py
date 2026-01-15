@@ -16,13 +16,27 @@ def simulate_flowsheet(flowsheet_yaml: str) -> dict:
 @mcp.tool()
 def run_speciation(stream: dict) -> dict:
     try:
-        import reaktoro  # optional
+        from sep_agents.sim.reaktoro_adapter import run_reaktoro
+        from sep_agents.dsl.schemas import Stream
     except ImportError:
-        return {"status": "error", "error": "Reaktoro not installed"}
-    from sep_agents.dsl.schemas import Stream
-    s = Stream(**stream)
-    # TODO: Reaktoro call
-    return {"status": "ok", "stream_out": s.dict()}
+         return {"status": "error", "error": "Internal module import failed"}
+
+    try:
+        s = Stream(**stream)
+        s_out = run_reaktoro(s)
+        return {"status": "ok", "stream_out": s_out.dict()}
+    except Exception as e:
+        return {"status": "error", "error": str(e)}
+
+@mcp.tool()
+def perform_sweep(initial_conditions: dict, param_name: str, values: list) -> dict:
+    try:
+        from sep_agents.sim.equilibrium_agent import EquilibriumAgent
+        agent = EquilibriumAgent()
+        df = agent.sweep(initial_conditions, param_name, values)
+        return {"status": "ok", "results": df.to_dict(orient="records")}
+    except Exception as e:
+        return {"status": "error", "error": str(e)}
 
 @mcp.tool()
 def estimate_cost(kpis: dict) -> dict:

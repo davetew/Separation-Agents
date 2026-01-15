@@ -11,6 +11,8 @@ UNIT_PARAM_SPEC = {
     "cyclone": {"req": ["d50c_um"], "opt": ["sharpness_alpha","pressure_kPa"]},
     "lims": {"req": ["magnetic_recovery"], "opt": ["field_T"]},
     "flotation_bank": {"req": ["k_s_1ps","R_inf"], "opt": ["air_rate_m3m2s","froth_recovery","stages"]},
+    "leach_reactor": {"req": ["residence_time_s", "T_C"], "opt": ["tank_volume_m3", "agitation_power_kW"]},
+    "precipitator": {"req": ["residence_time_s", "reagent_dosage_gpl"], "opt": ["T_C", "target_pH"]},
     # ... add others as you use them
 }
 class PSD(BaseModel):

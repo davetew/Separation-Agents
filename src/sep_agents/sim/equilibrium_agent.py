@@ -13,6 +13,16 @@ from GeoH2.equilibrium import defineInitialState, equilibrium, defineSystem
 from GeoH2 import Q_
 from typing import Union, Dict, Any, List
 
+# Database-specific species synonyms
+# Key: Substring to match in database name (lowercase)
+# Value: Dict of {GenericName: DatabaseSpecificName}
+SPECIES_MAPPING = {
+    "supcrt": {"H2O": "H2O(aq)", "CO2": "CO2(aq)"},
+    "suprcrt": {"H2O": "H2O(aq)", "CO2": "CO2(aq)", "CaCO3": "Calcite"}, # Handle possible typo in stored database names
+    "phreeqc": {"H2O": "H2O"}, # Phreeqc uses H2O
+    "pitzer": {"H2O": "H2O"},
+}
+
 class EquilibriumAgent:
     """
     Agent for performing equilibrium assessments of chemical systems.
@@ -56,10 +66,19 @@ class EquilibriumAgent:
         Returns:
             rkt.ChemicalState: The defined chemical state.
         """
+        # Determine mapping based on database name
+        db_key = next((k for k in SPECIES_MAPPING if k in self.database_name.lower()), None)
+        mapping = SPECIES_MAPPING.get(db_key, {})
+
+        # Remap composition keys
+        spec = mineral_spec
+        if isinstance(mineral_spec, dict):
+             spec = {mapping.get(k, k): v for k, v in mineral_spec.items()}
+
         return defineInitialState(
             T_C=T_C,
             p_bar=p_bar,
-            mineralSpec=mineral_spec,
+            mineralSpec=spec,
             w_r=w_r,
             c_r=c_r,
             salinity_g_kg=salinity_g_kg,
@@ -104,40 +123,71 @@ class EquilibriumAgent:
         
         print(f"Running sweep for {param_name} over {len(param_values)} points...")
         
+        prev_state = None
+        
         for val in param_values:
             # Update conditions with the current sweep value
             current_conditions = initial_conditions.copy()
             current_conditions[param_name] = val
             
-            # Define state
+            res = {param_name: val}
+            
             try:
+                # Define initial state
+                # Strategy: If we have a previous successful state and we are just changing T or P, 
+                # we can try to use the previous state as a guess (Warm Start).
+                # However, ensuring mass balance consistency is tricky if we don't know exactly what changed.
+                # For safety, we always define a fresh state first (guarantees correct definition)
+                # But to enable warm restart, we might need to rely on Reaktoro's solver capabilities 
+                # or manually set properties of the fresh state to match previous?
+                
+                # Simple approach: Always fresh definition first
                 state = self.define_state(**current_conditions)
+                
+                # If we have a previous state and are sweeping T/P, we *could* try to use it,
+                # but 'equilibrium()' takes 'state' as the definition of the problem.
+                # If we pass 'prev_state', we must ensure it has the correct T/P/Composition for THIS step.
+                
+                # Let's stick to fresh definition for correctness, but catch failures.
                 
                 # Solve equilibrium
                 eq_state = self.solve(state, constraint)
                 
+                if eq_state is None:
+                    raise RuntimeError("Equilibrium solver returned None (convergence failure)")
+
                 # Extract results
                 props = rkt.ChemicalProps(eq_state)
                 aprops = rkt.AqueousProps(eq_state)
                 
-                res = {
-                    param_name: val,
-                    "Temperature (C)": props.temperature() - 273.15,
-                    "Pressure (bar)": props.pressure() / 1e5,
-                    "pH": aprops.pH(),
-                    "Eh (V)": aprops.Eh(),
-                    "Volume (m3)": props.volume(),
-                    "Enthalpy (J)": props.enthalpy()
-                }
+                res.update({
+                    "Temperature (C)": float(props.temperature() - 273.15),
+                    "Pressure (bar)": float(props.pressure() / 1e5),
+                    "pH": float(aprops.pH()),
+                    "Eh (V)": float(aprops.Eh()),
+                    "Volume (m3)": float(props.volume()),
+                    "Enthalpy (J)": float(props.enthalpy()),
+                    "status": "converged"
+                })
                 
-                # Add species amounts (optional, can be verbose)
-                # For now, maybe just add specific important ones if needed
-                # or we can add all species > threshold
-                
-                results.append(res)
+                # Store successful state for potential future warm start usage
+                prev_state = eq_state
                 
             except Exception as e:
-                print(f"Error at {param_name}={val}: {e}")
+                # Log error but continue
+                print(f"Warning: Equilibrium calculation failed at {param_name}={val}: {e}")
+                res.update({
+                    "Temperature (C)": None,
+                    "Pressure (bar)": None,
+                    "pH": None,
+                    "Eh (V)": None,
+                    "Volume (m3)": None,
+                    "Enthalpy (J)": None,
+                    "status": "failed",
+                    "error": str(e)
+                })
+                
+            results.append(res)
                 
         return pd.DataFrame(results)
 
