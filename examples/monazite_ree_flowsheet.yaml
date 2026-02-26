@@ -1,0 +1,32 @@
+name: monazite_ree_separation
+streams:
+  - name: monazite_feed
+    phase: liquid
+    composition_wt:
+      H2O(aq): 1000.0
+      HCl(aq): 50.0
+      La+3: 10.0
+      Ce+3: 15.0
+      Pr+3: 1.5
+      Nd+3: 5.0
+      Sm+3: 0.5
+units:
+  - id: extraction_cascade_1
+    type: solvent_extraction
+    inputs: ["monazite_feed"]
+    outputs: ["aq_raffinate_light_ree", "org_extract_heavy_ree"]
+    params:
+      organic_to_aqueous_ratio: 1.5
+      # D2EHPA extracts heavier REEs (Sm, Nd) more strongly than light REEs (La, Ce)
+      distribution_coeff:
+        La+3: 0.05
+        Ce+3: 0.1
+        Pr+3: 0.2
+        Nd+3: 0.8
+        Sm+3: 5.0
+  - id: precipitation_ce
+    type: crystallizer
+    inputs: ["aq_raffinate_light_ree"]
+    outputs: ["ce_crystals", "liquor_la_nd"]
+    params:
+      T_C: 25.0

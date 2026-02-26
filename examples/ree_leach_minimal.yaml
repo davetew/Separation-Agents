@@ -1,0 +1,68 @@
+# REE Leach-Separation Minimal Example
+# ======================================
+# Simplified rare earth element separation from a monazite-like feed.
+# Feed → Leach (HCl) → Impurity precipitation → Thickener → Product
+#
+# This example demonstrates the IDAES adapter with Reaktoro equilibrium
+# for a hydrometallurgical REE separation process.
+
+name: ree_leach_separation
+
+streams:
+  - name: ore_feed
+    phase: solid
+    temperature_K: 298.15
+    pressure_Pa: 101325
+    composition_wt:
+      Calcite: 0.3
+      Quartz: 0.2
+      Fe2O3: 0.15
+      Al2O3: 0.10
+      MgO: 0.05
+      # REE species (fed as basic ions since supcrtbl lacks specific REE phosphates)
+      Ce+3: 0.10
+      La+3: 0.05
+      Nd+3: 0.05
+
+  - name: acid_solution
+    phase: liquid
+    temperature_K: 298.15
+    pressure_Pa: 101325
+    composition_wt:
+      H2O(aq): 55.5
+      HCl(aq): 2.0
+    pH: 0.5
+
+units:
+  # Step 1: Grind the ore
+  - id: mill_1
+    type: mill
+    params:
+      fineness_factor: 0.8
+      E_specific_kWhpt: 12.0
+    inputs: [ore_feed]
+    outputs: [ground_ore]
+
+  # Step 2: Mix ground ore with acid
+  - id: mixer_1
+    type: mixer
+    params: {}
+    inputs: [ground_ore, acid_solution]
+    outputs: [leach_feed]
+
+  # Step 3: Acid leach reactor (Reaktoro equilibrium)
+  - id: leach_1
+    type: leach_reactor
+    params:
+      residence_time_s: 7200
+      T_C: 80
+    inputs: [leach_feed]
+    outputs: [pregnant_solution]
+
+  # Step 4: Thicken to separate solids
+  - id: thickener_1
+    type: thickener
+    params:
+      recovery: 0.85
+    inputs: [pregnant_solution]
+    outputs: [clarified_liquor, residue]

@@ -88,45 +88,47 @@ class ReaktoroParameterBlockData(PhysicalParameterBlock):
             )
             
             # Extract Component List from the System
-            # We will use ALL species in the system as components for the IDAES property package
-            self.species_list = []
-            species_set = set()
+        _species_list = []
+        species_set = set()
+        if rkt:
             for phase in self.rkt_system.phases():
                 for species in phase.species():
-                    self.species_list.append(species.name())
+                    _species_list.append(species.name())
                     species_set.add(species.name())
-            
-            # Extract Phase List & Handle Collisions
-            self.phase_list = []
+        else:
+            _species_list = ["H2O"]
+            species_set = {"H2O"}
+
+        # Extract Phase List & Handle Collisions
+        _phase_list = []
+        if rkt:
             for p in self.rkt_system.phases():
                 p_name = p.name()
                 idaes_p_name = p_name
-                # Collision check
                 if p_name in species_set:
                     idaes_p_name = p_name + "_phase"
-                
-                self.phase_list.append(idaes_p_name)
+                _phase_list.append(idaes_p_name)
                 self._rkt_phase_map[idaes_p_name] = p_name
-
         else:
-            # Fallback for when Rektoro is not installed (e.g. testing import)
-            self.species_list = ["H2O"]
-            self.phase_list = ["AqueousPhase"]
+            _phase_list = ["AqueousPhase"]
 
+        # Define Components and Phases in IDAES as Pyomo Sets
+        self.phase_list = Set(initialize=_phase_list)
+        self.component_list = Set(initialize=_species_list)
+        self.phase_component_set = Set(
+            initialize=[(p, c) for p in _phase_list for c in _species_list]
+        )
 
-        # Define Components and Phases in IDAES
-        # IDAES requires these Sets to exist
-        self.component_list = Set(initialize=self.species_list)
-        self.phase_list_set = Set(initialize=self.phase_list)
+        # Store for python access
+        self.species_list = _species_list
+        self.phase_list_python = _phase_list
 
         # Create Component Objects
-        # We treat everything as a "Component" for now. 
-        # In future we might distinguish Solute/Solvent.
-        for c_name in self.species_list:
+        for c_name in _species_list:
             self.add_component(c_name, Component())
 
         # Create Phase Objects
-        for p_name in self.phase_list:
+        for p_name in _phase_list:
             self.add_component(p_name, Phase())
             
     @classmethod
@@ -155,11 +157,23 @@ class ReaktoroParameterBlockData(PhysicalParameterBlock):
         )
 
 
-@declare_process_block_class("ReaktoroStateBlock")
+@declare_process_block_class("ReaktoroStateBlock", block_class=StateBlock)
 class ReaktoroStateBlockData(StateBlockData):
     """
     Data container for Reaktoro State Block.
     """
+
+    @property
+    def phase_component_set(self):
+        return self.params.phase_component_set
+
+    @property
+    def phase_list(self):
+        return self.params.phase_list
+
+    @property
+    def component_list(self):
+        return self.params.component_list
 
     def build(self):
         """Build the StateBlock objects."""
@@ -197,7 +211,7 @@ class ReaktoroStateBlockData(StateBlockData):
         # We define them as Variables so IDAES units can link to them.
         # We will NOT add constraints by default, but populate them via methods.
         
-        phases = self.params.phase_list_set
+        phases = self.params.phase_list
         
         self.enth_mol_phase = Var(
             phases,
@@ -227,6 +241,20 @@ class ReaktoroStateBlockData(StateBlockData):
         # Place to store the underlying Reaktoro state object for persistence/access
         self._rkt_state = None
 
+
+    def default_material_balance_type(self):
+        return MaterialBalanceType.componentTotal
+
+    def default_energy_balance_type(self):
+        return EnergyBalanceType.enthalpyTotal
+
+    def define_port_members(self):
+        return {
+            "flow_mol": self.flow_mol,
+            "mole_frac_comp": self.mole_frac_comp,
+            "temperature": self.temperature,
+            "pressure": self.pressure,
+        }
 
     def _update_reaktoro_state(self):
         """

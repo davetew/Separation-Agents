@@ -12,12 +12,17 @@ sys.path.append(str(src_path))
 geoh2_path = Path(__file__).parent.parent.parent / "GeoH2"
 sys.path.append(str(geoh2_path))
 
-# Mock dependencies
-from unittest.mock import MagicMock
-sys.modules["reaktoro"] = MagicMock()
-sys.modules["GeoH2"] = MagicMock()
-sys.modules["GeoH2.equilibrium"] = MagicMock()
-sys.modules["GeoH2.Q_"] = MagicMock()
+# Mock dependencies if not available
+try:
+    import reaktoro
+    import GeoH2
+    import GeoH2.equilibrium
+except ImportError:
+    from unittest.mock import MagicMock
+    sys.modules.setdefault("reaktoro", MagicMock())
+    sys.modules.setdefault("GeoH2", MagicMock())
+    sys.modules.setdefault("GeoH2.equilibrium", MagicMock())
+    sys.modules.setdefault("GeoH2.Q_", MagicMock())
 
 class TestArchitecture(unittest.TestCase):
 

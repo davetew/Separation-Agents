@@ -1,18 +1,15 @@
-
 # Separation Agents (skeleton)
 
 LLM-guided, physics-grounded **multi-agent** system that can propose, simulate, and optimize
-mineral/metal separation flowsheets. This is a *skeleton repo* to get you started—plug in your
-MCP server, high-fidelity models, and data as you go.
+mineral/metal separation flowsheets (specifically targeting Rare Earth Elements).
 
 ## Key ideas
 - **Flowsheet DSL** (YAML/JSON) → validated into Pydantic models.
-- **Unit op stubs** (comminution, cyclone, magnetic, flotation, hydromet, thickener).
-- **Sim adapters** for IDAES/Pyomo and Reaktoro (hooks only here).
-- **Optimizer** (Optuna/Bayesian) with multi-objective placeholders.
+- **Unit op stubs** (comminution, cyclone, magnetic, flotation, hydromet, precipitator, solvent extraction).
+- **Sim adapters** for IDAES/Pyomo and Reaktoro (equilbrium speciation with custom REE databases).
+- **Techno-Economic Analysis (TEA) & Life Cycle Assessment (LCA)** embedded into the sequences, allowing for agent-driven OPEX and $CO_2$e evaluation.
+- **Optimizer** (BoTorch Bayesian Optimization) for rapid multi-variable parameter optimization (e.g., minimizing OPEX via continuous unit parameter adjustments).
 - **Orchestrator** loop that ties proposal → simulate → critique → optimize.
-- **Critic** for balance/compatibility checks.
-- **TEA/LCA** stubs with simple cost hooks.
 
 ## Quickstart
 ```bash
@@ -25,7 +22,7 @@ pip install -e .
 # Optional heavy deps
 pip install 'sep-agents[thermo]'
 
-# Run the tiny example loop
+# Start notebook or run CLI flowsheet
 python scripts/run_loop.py examples/steel_slag_minimal.yaml
 ```
 
@@ -34,11 +31,13 @@ python scripts/run_loop.py examples/steel_slag_minimal.yaml
 src/sep_agents/
   dsl/                # schemas & loaders
   units/              # unit op stubs
-  sim/                # adapters to physics engines
-  opt/                # optimization strategies
+  sim/                # adapters to physics engines (IDAES, Reaktoro)
+  opt/                # optimization strategies (BoTorch)
   orchestrator/       # planner loop
   critic/             # feasibility & sanity checks
-  cost/               # TEA/LCA stubs
+  properties/         # custom thermodynamic element databases
+  cost/               # TEA/LCA capabilities
+docs/                 # Comprehensive documentation and tutorials
 examples/
 scripts/
 tests/
@@ -49,30 +48,29 @@ This repo includes an **MCP server** under `mcp_server/` that exposes tools:
 
 - `simulate_flowsheet` – run an IDAES-backed sim and return KPIs
 - `run_speciation` – Reaktoro speciation for a stream
-- `estimate_cost` – TEA/LCA stubs
-- `optimize_flowsheet` – propose param edits (placeholder)
+- `estimate_cost` – TEA/LCA computations
+- `optimize_flowsheet` – Rigorous Bayesian Optimization (SingleTaskGP) of unit parameters against target KPIs
 
 ### Run locally (stdio)
 
+```bash
 # Activate your env
-conda activate sep-agents   # or: source .venv/bin/activate
+conda activate rkt   # Ensure reaktoro is installed in this environment
 
 # Install the package (and dev tools)
 python -m pip install -e ".[dev]"
 
-# Optional: install Reaktoro for speciation
-#   conda install -c conda-forge reaktoro
-# or
-#   python -m pip install ".[thermo]"
+# Install Botrch for Bayesian Optimizer
+conda install botorch -c conda-forge
 
-# Install an MCP SDK (adjust to your chosen implementation)
+# Install an MCP SDK
 python -m pip install mcp
 
 # Start the MCP server (stdio transport)
 python mcp_server/server.py
+```
 
 ## What’s next
-- Wire your **MCP** planner to call: flowsheet_synthesizer, simulator, optimizer.
-- Replace unit stubs with calibrated physics/empirical hybrids.
-- Introduce multi-fidelity surrogates (BoTorch) for slow sims.
-- Add robust optimization across feed variability scenarios.
+- Full integration of AI Agents to holistically synthesize multi-unit operation pathways natively.
+- Deep Learning Kinetics to explicitly model rate-dependent non-equilibrium precipitation logic.
+- Expand TEA/LCA parameter databases beyond baseline hydrometallurgical proxies.

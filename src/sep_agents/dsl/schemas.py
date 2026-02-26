@@ -1,6 +1,6 @@
 
 from __future__ import annotations
-from typing import List, Dict, Optional, Literal
+from typing import Any, List, Dict, Optional, Literal
 from pydantic import BaseModel, Field, field_validator
 import networkx as nx
 
@@ -8,12 +8,28 @@ Phase = Literal["solid", "liquid", "gas"]
 
 UNIT_PARAM_SPEC = {
     "mill": {"req": ["fineness_factor"], "opt": ["E_specific_kWhpt", "media_type"]},
-    "cyclone": {"req": ["d50c_um"], "opt": ["sharpness_alpha","pressure_kPa"]},
+    "cyclone": {"req": ["d50c_um"], "opt": ["sharpness_alpha", "pressure_kPa"]},
     "lims": {"req": ["magnetic_recovery"], "opt": ["field_T"]},
-    "flotation_bank": {"req": ["k_s_1ps","R_inf"], "opt": ["air_rate_m3m2s","froth_recovery","stages"]},
-    "leach_reactor": {"req": ["residence_time_s", "T_C"], "opt": ["tank_volume_m3", "agitation_power_kW"]},
-    "precipitator": {"req": ["residence_time_s", "reagent_dosage_gpl"], "opt": ["T_C", "target_pH"]},
-    # ... add others as you use them
+    "flotation_bank": {"req": ["k_s_1ps", "R_inf"], "opt": ["air_rate_m3m2s", "froth_recovery", "stages"]},
+    "leach_reactor": {"req": ["residence_time_s", "T_C"], "opt": ["tank_volume_m3", "agitation_power_kW", "p_bar"]},
+    "precipitator": {"req": ["residence_time_s", "reagent_dosage_gpl"], "opt": ["T_C", "target_pH", "p_bar"]},
+    "mixer": {"req": [], "opt": []},
+    "solvent_extraction": {
+        "req": ["distribution_coeff", "organic_to_aqueous_ratio"],
+        "opt": ["stages", "T_C", "extractant", "diluent"],
+    },
+    "ion_exchange": {
+        "req": ["selectivity_coeff", "bed_volume_m3"],
+        "opt": ["resin_type", "flow_rate_BV_per_hr", "T_C"],
+    },
+    "crystallizer": {
+        "req": ["T_C", "residence_time_s"],
+        "opt": ["cooling_rate_K_per_s", "seed_loading_gpl"],
+    },
+    "thickener": {
+        "req": [],
+        "opt": ["recovery", "underflow_solids_frac", "overflow_clarity"],
+    },
 }
 class PSD(BaseModel):
     bins_um: List[float] = Field(..., description="Upper size in microns for each bin")
@@ -46,24 +62,30 @@ class Stream(BaseModel):
 class UnitOp(BaseModel):
     id: str
     type: str  # e.g., 'mill', 'cyclone', 'lims', 'flotation', 'leach', 'thickener'
-    params: Dict[str, float] = Field(default_factory=dict)
+    params: Dict[str, Any] = Field(default_factory=dict)
     inputs: List[str] = Field(default_factory=list)
     outputs: List[str] = Field(default_factory=list)
 
-    @field_validator("params")
-    def check_params(cls, v, values):
-        unit_type = values.get("type")
+    from pydantic import model_validator
+
+    @model_validator(mode="after")
+    def check_params(self):
+        unit_type = self.type
         if unit_type not in UNIT_PARAM_SPEC:
-            raise ValueError(f"Unknown unit type: {unit_type}")
-        req_params = UNIT_PARAM_SPEC[unit_type]["req"]
-        opt_params = UNIT_PARAM_SPEC[unit_type]["opt"]
+            import warnings
+            warnings.warn(f"Unknown unit type '{unit_type}'; skipping param validation")
+            return self
+        spec = UNIT_PARAM_SPEC[unit_type]
+        req_params = spec["req"]
+        opt_params = spec["opt"]
         for p in req_params:
-            if p not in v:
+            if p not in self.params:
                 raise ValueError(f"Missing required parameter '{p}' for unit type '{unit_type}'")
-        for p in v:
+        for p in self.params:
             if p not in req_params and p not in opt_params:
                 raise ValueError(f"Unknown parameter '{p}' for unit type '{unit_type}'")
-        return v
+        return self
+
 
 class Flowsheet(BaseModel):
     name: str

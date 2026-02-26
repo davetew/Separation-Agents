@@ -28,16 +28,25 @@ class EquilibriumAgent:
     Agent for performing equilibrium assessments of chemical systems.
     """
 
-    def __init__(self, database_name: str = "SUPRCRT - BL"):
+    def __init__(self, database_name: str = "SUPRCRT - BL", custom_system: rkt.ChemicalSystem = None):
         """
         Initialize the EquilibriumAgent.
 
         Args:
             database_name (str): The name of the thermodynamic database to use.
                                  Options: 'PHREEQC - LLNL', 'SUPRCRT - 16', 'SUPRCRT - BL'
+            custom_system (rkt.ChemicalSystem, optional): A pre-built Reaktoro
+                                 ChemicalSystem to bypass GeoH2's defineSystem.
         """
         self.database_name = database_name
-        self.system, self.minerals, self.solution, self.gases = defineSystem(database_name)
+        
+        if custom_system is not None:
+            self.system = custom_system
+            # GeoH2 functions expect these phase identifiers. By passing empty
+            # lists or defaults, we can bypass GeoH2's specific subset logic.
+            self.minerals, self.solution, self.gases = [], [], []
+        else:
+            self.system, self.minerals, self.solution, self.gases = defineSystem(database_name)
 
     def define_state(self, 
                      T_C: float, 
