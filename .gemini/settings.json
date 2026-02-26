@@ -1,0 +1,16 @@
+{
+	"mcpServers": {
+		"Separation-Agents": {
+			"command": "/Users/davidtew/anaconda3/envs/rkt/bin/python",
+			"args": [
+				"mcp_server/server.py"
+			],
+			"cwd": "/Users/davidtew/Library/CloudStorage/GoogleDrive-davetew@step-function.com/My Drive/Github/Separation-Agents",
+			"env": {
+				"PYTHONPATH": "src",
+				"FASTMCP_NO_BANNER": "1",
+				"FASTMCP_QUIET": "1"
+			}
+		}
+	}
+}

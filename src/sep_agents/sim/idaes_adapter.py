@@ -572,9 +572,6 @@ class IDAESFlowsheetBuilder:
         org_out = inlet.copy()
         aq_out = inlet.copy()
         
-        # Approximate organic flow (treating all flows as molar for now)
-        org_out.flow_mol = inlet.flow_mol * oa_ratio
-        
         aq_out.species_amounts = {}
         org_out.species_amounts = {}
         
@@ -600,7 +597,11 @@ class IDAESFlowsheetBuilder:
                 aq_out.species_amounts[sp] = amt_aq
             if amt_org > 1e-15:
                 org_out.species_amounts[sp] = amt_org
-                
+
+        # Compute actual outlet flows from species sums
+        org_out.flow_mol = sum(org_out.species_amounts.values())
+        aq_out.flow_mol = sum(aq_out.species_amounts.values())
+
         outlets = {}
         if len(unit.outputs) >= 1:
             outlets[unit.outputs[0]] = org_out  # First is loaded organic
@@ -788,7 +789,7 @@ class IDAESFlowsheetBuilder:
             total_feed = sum(states[f.name].flow_mol for f in feeds if f.name in states)
             total_prod = sum(states[p].flow_mol for p in products if p in states)
             if total_feed > 0:
-                kpis["overall.recovery"] = round(total_prod / total_feed, 4)
+                kpis["overall.recovery"] = round(min(total_prod / total_feed, 1.0), 4)
 
         # Call Cost and LCA proxy estimators
         try:
