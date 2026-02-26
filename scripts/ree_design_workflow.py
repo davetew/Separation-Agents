@@ -189,19 +189,54 @@ best_x, best_y, history = opt.optimize(
     n_initial=3,
     n_iters=5
 )
+# Capture stream states from the result
+stream_states = result.get("states", {})
 
-# ── Step 5: Final Report ────────────────────────────────────────────────────
+# ── Step 5: Generate Markdown Report ────────────────────────────────────────
 print("\n" + "=" * 70)
-print("STEP 5: FINAL REPORT")
+print("STEP 5: GENERATING ANALYSIS REPORT")
 print("=" * 70)
 
-print(f"\n  Baseline OPEX:    ${baseline_kpis.get('overall.opex_USD', 'N/A')}")
-print(f"  Optimized OPEX:   ${best_y:.2f}")
-print(f"  Optimal O/A Ratio:     {best_x[0].item():.3f}")
-print(f"  Optimal Dosage (gpl):  {best_x[1].item():.3f}")
-print(f"\n  Optimization History:")
-for h in history:
-    print(f"    Iter {h['iter']}: best_y = {h['best_y']:.4f}")
+from sep_agents.report import generate_report
+
+REQUEST_TEXT = """\
+I have an incoming aqueous chloride leach liquor containing a mixture of
+Light Rare Earth Elements (LREEs). Design a flowsheet that isolates
+**Neodymium (Nd)** with the highest possible recovery and lowest possible
+Operating Expense (OPEX).
+
+**Feed**: 1000 kg H₂O, 15 mol Nd³⁺, 20 mol Ce³⁺, 10 mol La³⁺, 50 mol HCl.
+**Target KPI**: Minimize `overall.opex_USD`.
+**Design Variables**: `organic_to_aqueous_ratio` [0.5, 5.0], `reagent_dosage_gpl` [1.0, 50.0].
+"""
+
+# Build optimized KPI dict
+opt_kpis = dict(baseline_kpis)
+opt_kpis["overall.opex_USD"] = best_y
+
+opt_params = {
+    "organic_to_aqueous_ratio": best_x[0].item(),
+    "reagent_dosage_gpl": best_x[1].item(),
+}
+
+report_dir = os.path.join(
+    os.path.dirname(__file__), "..", "reports"
+)
+
+report_md, report_path = generate_report(
+    request_text=REQUEST_TEXT,
+    flowsheet=flowsheet,
+    result=result,
+    states=stream_states,
+    baseline_kpis=baseline_kpis,
+    optimized_kpis=opt_kpis,
+    opt_params=opt_params,
+    opt_history=history,
+    output_dir=report_dir,
+)
+
+print(f"  Report written to: {os.path.abspath(report_path)}")
+print(f"  Report length: {len(report_md)} characters")
 
 print("\n" + "=" * 70)
 print("WORKFLOW COMPLETE")

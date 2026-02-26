@@ -4,11 +4,17 @@ Welcome to the **Mineral Separation Agents** documentation. This project is a mu
 
 ## Table of Contents
 
-1. [Tutorial: Building and Optimizing Flowsheets](tutorial.md)
+1. [Technical Report: REE Separation Process Modeling](technical_report.md)
+   - REE Separation Process Overview and Chemistry
+   - Sequential-Modular Flowsheet Solver Architecture
+   - Thermodynamic Property Models (Reaktoro / SUPCRTBL / Custom Species)
+   - Techno-Economic Analysis (TEA) and Life Cycle Assessment (LCA)
+   - Bayesian Optimization with BoTorch (SingleTaskGP + LogEI)
+2. [Tutorial: Building and Optimizing Flowsheets](tutorial.md)
    - Defining Feeds and Units
    - Integrating TEA and LCA
    - BoTorch Parameter Optimization
-2. [Gaps and Limitations](gaps_limitations.md)
+3. [Gaps and Limitations](gaps_limitations.md)
    - Deep BoTorch Parameter Optimization
    - Deep Learning Kinetics
    - Database and Cost Model Fidelity

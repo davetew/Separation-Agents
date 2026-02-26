@@ -12,7 +12,7 @@ UNIT_PARAM_SPEC = {
     "lims": {"req": ["magnetic_recovery"], "opt": ["field_T"]},
     "flotation_bank": {"req": ["k_s_1ps", "R_inf"], "opt": ["air_rate_m3m2s", "froth_recovery", "stages"]},
     "leach_reactor": {"req": ["residence_time_s", "T_C"], "opt": ["tank_volume_m3", "agitation_power_kW", "p_bar"]},
-    "precipitator": {"req": ["residence_time_s", "reagent_dosage_gpl"], "opt": ["T_C", "target_pH", "p_bar"]},
+    "precipitator": {"req": ["residence_time_s", "reagent_dosage_gpl"], "opt": ["T_C", "target_pH", "p_bar", "reagent_name"]},
     "mixer": {"req": [], "opt": []},
     "solvent_extraction": {
         "req": ["distribution_coeff", "organic_to_aqueous_ratio"],
@@ -24,7 +24,7 @@ UNIT_PARAM_SPEC = {
     },
     "crystallizer": {
         "req": ["T_C", "residence_time_s"],
-        "opt": ["cooling_rate_K_per_s", "seed_loading_gpl"],
+        "opt": ["cooling_rate_K_per_s", "seed_loading_gpl", "reagent_dosage_gpl", "reagent_name"],
     },
     "thickener": {
         "req": [],

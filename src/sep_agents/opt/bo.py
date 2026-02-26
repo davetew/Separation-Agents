@@ -5,7 +5,7 @@ import logging
 import torch
 from botorch.models import SingleTaskGP
 from botorch.fit import fit_gpytorch_mll
-from botorch.acquisition import ExpectedImprovement
+from botorch.acquisition import LogExpectedImprovement
 from botorch.optim import optimize_acqf
 from gpytorch.mlls import ExactMarginalLogLikelihood
 from scipy.stats import qmc
@@ -77,7 +77,7 @@ class BotorchOptimizer:
             
             # 4. Construct Expected Improvement acquisition function
             best_f = train_y_norm.max()
-            acqf = ExpectedImprovement(model=model, best_f=best_f)
+            acqf = LogExpectedImprovement(model=model, best_f=best_f)
             
             # 5. Optimize the acquisition function to find next candidate
             candidate, acq_value = optimize_acqf(

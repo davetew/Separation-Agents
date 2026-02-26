@@ -53,11 +53,11 @@ except Exception:
 # Unit type classification
 # ---------------------------------------------------------------------------
 SEPARATOR_TYPES = {"cyclone", "lims", "flotation_bank", "thickener"}
-REACTOR_TYPES = {"leach_reactor", "precipitator"}
+REACTOR_TYPES = {"leach_reactor"}
 MIXER_TYPES = {"mixer"}
 SX_TYPES = {"solvent_extraction"}
 IX_TYPES = {"ion_exchange"}
-CRYSTALLIZER_TYPES = {"crystallizer"}
+CRYSTALLIZER_TYPES = {"crystallizer", "precipitator"}
 
 
 # ---------------------------------------------------------------------------
@@ -184,6 +184,7 @@ class IDAESFlowsheetBuilder:
             return {
                 "status": "ok",
                 "streams": {n: s.to_dict() for n, s in stream_states.items()},
+                "states": stream_states,
                 "kpis": self._compute_kpis(flowsheet, stream_states),
                 "model_name": flowsheet.name,
             }
@@ -347,7 +348,13 @@ class IDAESFlowsheetBuilder:
         system = None
         if REAKTORO_AVAILABLE and rkt is not None:
             try:
-                system, _, _, _ = self._get_rkt_system()
+                result = self._get_rkt_system()
+                # _get_rkt_system returns a bare ChemicalSystem for REE presets,
+                # or a 4-tuple from GeoH2. Normalize to just the system object.
+                if isinstance(result, tuple):
+                    system = result[0]
+                else:
+                    system = result
             except Exception as exc:
                 _log.warning("Could not build Reaktoro system for mass-to-mol conversion: %s", exc)
 
@@ -488,6 +495,27 @@ class IDAESFlowsheetBuilder:
                 state.setSpeciesAmount(sp_name, amount, "mol")
             else:
                 _log.debug("Species '%s' not in Reaktoro system, skipped", sp_name)
+
+        # Handle reagent dosage injection
+        if "reagent_dosage_gpl" in unit.params and "reagent_name" in unit.params:
+            reagent_name = unit.params["reagent_name"]
+            dosage_gpl = float(unit.params["reagent_dosage_gpl"])
+            
+            # Estimate aqueous volume in liters (assuming ~1 kg/L)
+            amt_h2o = inlet.species_amounts.get("H2O(aq)", inlet.species_amounts.get("H2O", 0.0))
+            vol_l = (amt_h2o * 18.015) / 1000.0
+            
+            mass_reagent_g = dosage_gpl * vol_l
+            
+            # Molar mass conversion (fallback to 40 g/mol for NaOH if not found)
+            from ..cost.tea import MOLAR_MASS_G_PER_MOL
+            mw = MOLAR_MASS_G_PER_MOL.get(reagent_name, 40.0)
+            amt_reagent_mol = mass_reagent_g / mw
+            
+            if reagent_name in system_species:
+                current = float(state.speciesAmount(reagent_name))
+                state.setSpeciesAmount(reagent_name, current + amt_reagent_mol, "mol")
+                _log.info(f"Unit {unit.id}: injected {amt_reagent_mol:.4f} mol of {reagent_name}")
 
         # Solve equilibrium
         try:
@@ -684,7 +712,12 @@ class IDAESFlowsheetBuilder:
         
         # Heuristic solid/liquid separation via species names
         for sp, amt in mixed_out.species_amounts.items():
-            if sp.endswith("(aq)") or sp in ["H2O", "H+", "OH-", "Na+", "Cl-", "CO2(aq)"]:
+            # Partition into liquor if it has (aq) suffix, common ions, or charge markers (+/-)
+            if (
+                sp.endswith("(aq)")
+                or sp in ["H2O", "H2O(aq)", "H+", "OH-", "Na+", "Cl-", "CO2(aq)"]
+                or any(c in sp for c in ["+", "-"])
+            ):
                 liquor.species_amounts[sp] = amt
             else:
                 crystals.species_amounts[sp] = amt
