@@ -411,5 +411,145 @@ def simulate_sx_cascade(
     except Exception as e:
         return {"status": "error", "error": str(e)}
 
+# ---------------------------------------------------------------------------
+# GDP Superstructure Optimization Tools
+# ---------------------------------------------------------------------------
+
+@mcp.tool()
+def list_superstructures_tool() -> dict:
+    """List available predefined REE separation superstructures.
+
+    Returns a list of superstructure templates that can be optimized
+    using `optimize_superstructure_tool`.  Each entry includes the name,
+    description, number of units, disjunctions, and optional units.
+    """
+    try:
+        from sep_agents.dsl.ree_superstructures import list_superstructures
+        return {"status": "ok", "superstructures": list_superstructures()}
+    except Exception as e:
+        return {"status": "error", "error": str(e)}
+
+
+@mcp.tool()
+def evaluate_topology(
+    superstructure_name: str,
+    active_unit_ids: list[str],
+    param_overrides: dict = None,
+    database: str = "light_ree",
+) -> dict:
+    """Evaluate a specific topology configuration from a superstructure.
+
+    Builds a sub-flowsheet with only the specified active units, solves it,
+    and returns KPIs.  Useful for comparing specific configurations without
+    running full optimization.
+
+    Args:
+        superstructure_name: Name of a predefined superstructure (e.g. "simple_sx_precip").
+        active_unit_ids: List of unit IDs to activate (others are bypassed).
+        param_overrides: Optional dict of "unit_id.param_name" → value overrides.
+        database: Reaktoro database preset.
+    """
+    try:
+        from sep_agents.dsl.ree_superstructures import SUPERSTRUCTURE_REGISTRY
+        from sep_agents.opt.gdp_builder import Configuration, build_sub_flowsheet
+        from sep_agents.opt.gdp_solver import evaluate_configuration
+
+        if superstructure_name not in SUPERSTRUCTURE_REGISTRY:
+            return {"status": "error", "error": f"Unknown superstructure: {superstructure_name}. "
+                    f"Available: {list(SUPERSTRUCTURE_REGISTRY.keys())}"}
+
+        ss = SUPERSTRUCTURE_REGISTRY[superstructure_name]()
+        all_ids = {u.id for u in ss.base_flowsheet.units}
+        active = frozenset(active_unit_ids)
+        bypassed = frozenset(all_ids - active)
+
+        config = Configuration(id=0, active_unit_ids=active, bypassed_unit_ids=bypassed)
+        ev = evaluate_configuration(ss, config, database=database, param_overrides=param_overrides)
+
+        return {
+            "status": ev.status,
+            "active_units": sorted(ev.config.active_unit_ids),
+            "bypassed_units": sorted(ev.config.bypassed_unit_ids),
+            "kpis": ev.kpis,
+            "objective_value": ev.objective_value,
+            "elapsed_s": round(ev.elapsed_s, 2),
+            "error": ev.error if ev.status != "ok" else None,
+        }
+    except Exception as e:
+        return {"status": "error", "error": str(e)}
+
+
+@mcp.tool()
+def optimize_superstructure_tool(
+    superstructure_name: str,
+    objective: str = "minimize_opex",
+    optimize_continuous: bool = False,
+    n_bo_iters: int = 5,
+    database: str = "light_ree",
+) -> dict:
+    """Optimize a superstructure to find the best process topology.
+
+    Enumerates all valid topology configurations (which units to include,
+    how many stages), evaluates each via sequential-modular simulation,
+    and ranks results by the specified objective.  Optionally runs BoTorch
+    Bayesian Optimization on continuous parameters within each topology.
+
+    Args:
+        superstructure_name: Name of a predefined superstructure
+            (e.g. "simple_sx_precip", "lree_acid_leach").
+        objective: Optimization objective. One of:
+            "minimize_opex", "maximize_recovery", "minimize_lca",
+            "maximize_value_per_kg_ore".
+        optimize_continuous: If True, also optimize continuous parameters
+            (e.g. O/A ratio) within each topology using BoTorch.
+        n_bo_iters: Number of BoTorch iterations per topology (if enabled).
+        database: Reaktoro database preset.
+    """
+    try:
+        from sep_agents.dsl.ree_superstructures import SUPERSTRUCTURE_REGISTRY
+        from sep_agents.opt.gdp_solver import optimize_superstructure
+
+        if superstructure_name not in SUPERSTRUCTURE_REGISTRY:
+            return {"status": "error", "error": f"Unknown superstructure: {superstructure_name}. "
+                    f"Available: {list(SUPERSTRUCTURE_REGISTRY.keys())}"}
+
+        ss = SUPERSTRUCTURE_REGISTRY[superstructure_name]()
+        ss.objective = objective
+
+        result = optimize_superstructure(
+            ss,
+            database=database,
+            optimize_continuous=optimize_continuous,
+            n_bo_iters=n_bo_iters,
+        )
+
+        # Format results for MCP response
+        ranked = []
+        for ev in sorted(result.all_results, key=lambda r: r.objective_value):
+            ranked.append({
+                "rank": len(ranked) + 1,
+                "active_units": sorted(ev.config.active_unit_ids),
+                "bypassed_units": sorted(ev.config.bypassed_unit_ids),
+                "stage_choices": ev.config.stage_choices,
+                "objective_value": round(ev.objective_value, 4),
+                "kpis": {k: round(v, 4) if isinstance(v, float) else v
+                         for k, v in ev.kpis.items()},
+                "optimized_params": ev.optimized_params,
+                "status": ev.status,
+                "elapsed_s": round(ev.elapsed_s, 2),
+            })
+
+        return {
+            "status": "ok",
+            "objective": objective,
+            "num_configs_evaluated": result.num_configs_evaluated,
+            "total_elapsed_s": round(result.total_elapsed_s, 1),
+            "best": ranked[0] if ranked else None,
+            "all_ranked": ranked,
+        }
+    except Exception as e:
+        return {"status": "error", "error": str(e)}
+
+
 if __name__ == "__main__":
     mcp.run()  # stdio by default; see docs for other transports

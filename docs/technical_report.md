@@ -18,6 +18,8 @@
    - 3.1 [Sequential-Modular Flowsheet Solver](#31-sequential-modular-flowsheet-solver)
    - 3.2 [Domain-Specific Language (DSL)](#32-domain-specific-language-dsl)
    - 3.3 [Unit Operation Models](#33-unit-operation-models)
+   - 3.4 [Equation-Oriented (EO) Flowsheet Solver](#34-equation-oriented-eo-flowsheet-solver)
+   - 3.5 [Generalized Disjunctive Programming (GDP)](#35-generalized-disjunctive-programming-gdp)
 4. [Thermodynamic Property Models](#4-thermodynamic-property-models)
    - 4.1 [Reaktoro and the SUPCRTBL Database](#41-reaktoro-and-the-supcrtbl-database)
    - 4.2 [REE Database Configuration](#42-ree-database-configuration)
@@ -162,17 +164,17 @@ The DSL is serializable to/from YAML, enabling LLM agents to synthesize flowshee
 
 ### 3.3 Unit Operation Models
 
-The adapter implements the following unit models:
+Both SM and EO backends implement the following unit models:
 
-| Unit Type | Solver Method | Model Basis |
-|-----------|--------------|-------------|
-| `solvent_extraction` | `_solve_solvent_extraction` | Single-stage McCabe-Thiele with species-specific $D$ values |
-| `reactor` / `leach_reactor` | `_solve_reactor` | Reaktoro Gibbs energy minimization |
-| `precipitator` / `crystallizer` | `_solve_crystallizer` | Reaktoro equilibrium → solid/liquid partition |
-| `separator` / `magnetic_separator` | `_solve_separator` | Split fraction, cyclone, or flotation models |
-| `ion_exchange` | `_solve_ion_exchange` | Selectivity-coefficient based split |
-| `mixer` | `_solve_mixer` | Mass-weighted mixing |
-| `mill` / `crusher` | `_solve_mill` | Passthrough with energy consumption KPI |
+| Unit Type | SM Solver | EO Block | Model Basis |
+|-----------|-----------|----------|-------------|
+| `solvent_extraction` | `_solve_solvent_extraction` | `build_sx_stage` | McCabe-Thiele with species-specific $D$ values |
+| `precipitator` / `crystallizer` | `_solve_crystallizer` | `build_precipitator` | SM: Reaktoro equilibrium; EO: recovery-fraction model |
+| `ion_exchange` | `_solve_ion_exchange` | `build_ix_column` | Competitive Langmuir isotherm with slack decomposition |
+| `reactor` / `leach_reactor` | `_solve_reactor` | — | Reaktoro Gibbs energy minimization (SM only) |
+| `separator` / `magnetic_separator` | `_solve_separator` | — | Split fraction, cyclone, or flotation models |
+| `mixer` | `_solve_mixer` | — | Mass-weighted mixing |
+| `mill` / `crusher` | `_solve_mill` | — | Passthrough with energy consumption KPI |
 
 #### Solvent Extraction Model
 
@@ -206,6 +208,107 @@ The crystallizer combines Reaktoro equilibrium with a phase-separation step:
 1. Solve equilibrium (reusing the reactor solver)
 2. Partition species into **solid** (species without charge or `(aq)` suffix) and **aqueous** (species with `(aq)`, charged ions)
 3. Route each phase to the corresponding outlet
+
+### 3.4 Equation-Oriented (EO) Flowsheet Solver
+
+The EO backend ([`src/sep_agents/sim/eo_flowsheet.py`](../src/sep_agents/sim/eo_flowsheet.py)) formulates the entire flowsheet as a single Pyomo `ConcreteModel` solved simultaneously by IPOPT.
+
+#### Formulation
+
+The EO formulation uses a **flow-composition-temperature-pressure (FcTP)** approach:
+- **State variable**: `flow_mol_comp[j]` — molar flow rate per component
+- **Unit blocks**: Each unit is a Pyomo `Block` containing `Var`, `Constraint`, and `Expression` objects
+- **Inter-unit linking**: Equality constraints connect upstream outlet flows to downstream inlet flows
+
+```python
+from sep_agents.sim.eo_flowsheet import run_eo
+from sep_agents.dsl.schemas import Flowsheet, UnitOp, Stream
+
+result = run_eo(flowsheet, objective="minimize_opex")
+# result["status"] == "ok"
+# result["kpis"] contains OPEX, LCA, recovery metrics
+# result["model"] is the solved Pyomo model
+```
+
+#### EO Unit Models
+
+**1. Solvent Extraction (`sx_eo.py`)**: McCabe-Thiele with Pyomo `Var` for $D_j$ and $R_{O/A}$:
+
+$$\text{raffinate}_j = \frac{\text{feed}_j}{1 + D_j \cdot R_{O/A}}, \quad \text{organic}_j = \text{feed}_j - \text{raffinate}_j$$
+
+**2. Precipitator (`precipitator_eo.py`)**: Recovery-fraction model for numerical stability:
+
+$$\text{solid}_j = R_j \cdot \text{feed}_j, \quad \text{barren}_j = (1 - R_j) \cdot \text{feed}_j$$
+
+Avoids Ksp/softplus formulations that cause overflow during gradient computation.
+
+**3. Ion Exchange (`ix_eo.py`)**: Competitive Langmuir isotherm with capped recovery:
+
+$$q_j = q_{\max} \cdot \frac{K_j \cdot c_j}{1 + \sum_{k} K_k \cdot c_k}$$
+
+Recovery is capped at $\leq 1.0$ using slack decomposition: `raw_frac = recovery + slack`, preventing numerical infeasibility when theoretical loading exceeds feed.
+
+#### Advantages over SM
+
+| Feature | SM | EO |
+|---------|----|----|  
+| Speed (3-unit flowsheet) | ~10–20s | ~1.8s |
+| Gradient-based optimization | No (black-box) | Yes (IPOPT) |
+| GDP compatibility | Enumeration only | Native Pyomo.GDP |
+| Recycles | Not supported | Not supported (planned) |
+
+### 3.5 Generalized Disjunctive Programming (GDP)
+
+The GDP module ([`src/sep_agents/opt/gdp_eo.py`](../src/sep_agents/opt/gdp_eo.py)) enables **superstructure optimization** — simultaneously selecting the best process topology and optimizing continuous operating parameters.
+
+#### Superstructure Formulation
+
+A superstructure is a network containing:
+- **Fixed units**: Always present in the flowsheet
+- **Optional units**: May be active or bypassed (binary decision)
+- **XOR disjunctions**: Exactly one of a set of alternatives must be active
+
+These are encoded using Pyomo.GDP's `Disjunct` and `Disjunction` objects:
+
+```python
+from sep_agents.dsl.schemas import Superstructure, DisjunctionDef
+from sep_agents.opt.gdp_eo import solve_gdp_eo
+
+ss = Superstructure(
+    name="opt",
+    base_flowsheet=flowsheet,
+    fixed_units=["sx_1"],
+    disjunctions=[DisjunctionDef(name="sep", unit_ids=["sx_alt", "ix_alt"])],
+    objective="maximize_recovery",
+)
+result = solve_gdp_eo(ss)
+# result.active_units, result.bypassed_units, result.objective_value
+```
+
+#### Big-M Transformation
+
+The GDP model is converted to a standard MINLP using the Big-M relaxation:
+
+1. Each `Disjunct` (unit active / unit bypassed) contains the full set of unit constraints or passthrough constraints
+2. `Disjunction` constraints enforce XOR selection
+3. `TransformationFactory('gdp.bigm').apply_to(model)` relaxes the disjuncts into linear inequalities with binary indicator variables
+4. IPOPT solves the resulting NLP relaxation
+
+#### Bypass Semantics
+
+When a unit is bypassed, its outlet flows are set equal to its inlet flows via passthrough constraints:
+
+$$\text{outlet}_j = \text{inlet}_j \quad \forall j \in \text{components}$$
+
+This ensures mass balance closure regardless of topology selection.
+
+#### Supported Objectives
+
+| Objective | Description |
+|-----------|-------------|
+| `minimize_opex` | Minimize total proxy OPEX across active units |
+| `maximize_recovery` | Maximize total REE recovery fraction |
+| `none` | Feasibility solve only |
 
 ---
 
@@ -297,15 +400,16 @@ The increasing $pK_{sp}$ from La to Sm means heavier LREEs precipitate more read
 
 ### 4.4 Limitations of the Thermodynamic Model
 
-| Limitation | Impact | Mitigation Path |
-|-----------|--------|----------------|
-| **Constant $G^0$** for injected species | Temperature dependence is neglected | Use full $C_p(T)$ polynomial fits from NIST or literature |
-| **No SX thermodynamic model** | Distribution coefficients are empirical inputs, not predicted | Integrate COSMO-RS or empirical D-pH correlations |
-| **No kinetic model** | All reactors assume full equilibrium | Add residence-time-dependent conversion models |
-| **No activity coefficient model for organics** | Organic-phase non-ideality is ignored | Couple with UNIFAC or NRTL for organic phase |
-| **Limited mineral database** | Only explicitly injected REE solids are available | Expand to include all REE precipitate types |
-| **Single-stage SX only** | Counter-current cascades (50+ stages) are not modeled | Implement McCabe-Thiele cascade solver |
-| **Molar mass fallbacks** | Unknown species default to 100 g/mol | Expand molar mass lookup tables |
+| Limitation | Impact | Mitigation Path | Status |
+|-----------|--------|----------------|--------|
+| **Constant $G^0$** for injected species | Temperature dependence neglected | $C_p(T)$ polynomials from NIST | Open |
+| **No SX thermodynamic model** | $D$ values are empirical inputs | COSMO-RS or D-pH correlations | Open |
+| **No kinetic model** | All reactors assume equilibrium | Residence-time conversion models | Open |
+| **No activity model for organics** | Organic-phase non-ideality ignored | UNIFAC or NRTL | Open |
+| **Limited mineral database** | Only injected REE solids available | Expand precipitate types | Open |
+| ~~Single-stage SX only~~ | ~~Cascades not modeled~~ | ~~McCabe-Thiele cascade solver~~ | ✅ Resolved (EO) |
+| **Molar mass fallbacks** | Unknown species default to 100 g/mol | Expand lookup tables | Open |
+| **No recycle convergence** | Forward-only stream topology | Tear-stream iteration in EO | Open |
 
 ---
 

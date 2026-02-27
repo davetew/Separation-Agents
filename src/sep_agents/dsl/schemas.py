@@ -1,6 +1,6 @@
 
 from __future__ import annotations
-from typing import Any, List, Dict, Optional, Literal
+from typing import Any, List, Dict, Optional, Literal, Tuple
 from pydantic import BaseModel, Field, field_validator
 import networkx as nx
 
@@ -66,6 +66,16 @@ class UnitOp(BaseModel):
     inputs: List[str] = Field(default_factory=list)
     outputs: List[str] = Field(default_factory=list)
 
+    # -- GDP superstructure annotations --
+    optional: bool = False
+    """If True, this unit may be bypassed (inlet passes straight to outlet)."""
+    alternatives: List[str] = Field(default_factory=list)
+    """Mutually exclusive group name(s).  Units sharing the same alternative
+    group are placed in an XOR disjunction — exactly one is active."""
+    stage_range: Optional[Tuple[int, int]] = None
+    """For multi-stage units (e.g. SX cascades): (min_stages, max_stages).
+    Each candidate stage count becomes a separate disjunct."""
+
     from pydantic import model_validator
 
     @model_validator(mode="after")
@@ -116,3 +126,45 @@ class Flowsheet(BaseModel):
         if not feeds:  raise ValueError("No feed streams (not produced by any unit).")
         if not prods:  raise ValueError("No product/sink streams (not consumed by any unit).")
         return True
+
+
+# ---------------------------------------------------------------------------
+# GDP Superstructure models
+# ---------------------------------------------------------------------------
+
+Objective = Literal[
+    "minimize_opex",
+    "maximize_recovery",
+    "minimize_lca",
+    "maximize_value_per_kg_ore",
+]
+
+
+class DisjunctionDef(BaseModel):
+    """A named group of mutually exclusive unit choices.
+
+    Exactly one of the listed ``unit_ids`` will be active in the
+    optimized flowsheet.  This maps to a Pyomo ``Disjunction``.
+    """
+    name: str
+    unit_ids: List[str] = Field(..., min_length=2)
+    description: str = ""
+
+
+class Superstructure(BaseModel):
+    """A process superstructure for GDP topology optimization.
+
+    The ``base_flowsheet`` contains the **superset** of all possible units
+    (both required and optional).  The GDP solver determines which subset
+    to activate.
+    """
+    name: str
+    base_flowsheet: Flowsheet
+    disjunctions: List[DisjunctionDef] = Field(default_factory=list)
+    fixed_units: List[str] = Field(default_factory=list)
+    """Unit IDs that must always be active (never bypassed)."""
+    objective: Objective = "minimize_opex"
+    continuous_bounds: Dict[str, Tuple[float, float]] = Field(default_factory=dict)
+    """Optional bounds on continuous params for BoTorch, e.g.
+    ``{"sx_1.organic_to_aqueous_ratio": (0.5, 3.0)}``."""
+    description: str = ""

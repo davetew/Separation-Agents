@@ -533,3 +533,315 @@ def generate_report(
         f.write(report)
 
     return report, output_path
+
+# ═══════════════════════════════════════════════════════════════════════
+# GDP Superstructure Report
+# ═══════════════════════════════════════════════════════════════════════
+
+def generate_gdp_report(
+    gdp_result,
+    superstructure_name: str = "",
+    output_dir: str = "reports",
+    database: str = "light_ree",
+) -> tuple:
+    """Generate a comprehensive Markdown report for GDP optimization.
+
+    Includes the topology ranking **plus** full analysis-report detail
+    (flowsheet PNG, stream states, mass balance, $/kg metrics) for the
+    best configuration.
+
+    Parameters
+    ----------
+    gdp_result : GDPResult
+        Output from :func:`optimize_superstructure`.
+    superstructure_name : str
+        Name of the superstructure that was optimized.
+    output_dir : str
+        Directory to write the report file.
+    database : str
+        Reaktoro database preset (for re-evaluation of best config).
+
+    Returns
+    -------
+    tuple of (str, str)
+        (report_markdown, output_file_path)
+    """
+    from .opt.gdp_builder import build_sub_flowsheet
+    from .dsl.ree_superstructures import SUPERSTRUCTURE_REGISTRY
+    from .sim.idaes_adapter import IDAESFlowsheetBuilder
+
+    ts = datetime.now()
+    ts_str = ts.strftime("%Y-%m-%d %H:%M:%S")
+    ts_file = ts.strftime("%Y%m%d_%H%M%S")
+
+    os.makedirs(output_dir, exist_ok=True)
+    output_path = os.path.join(output_dir, f"gdp_report_{ts_file}.md")
+
+    lines = [
+        "# REE Separation — GDP Superstructure Optimization Report",
+        "",
+        f"**Generated**: {ts_str}  ",
+        f"**Superstructure**: {superstructure_name}  ",
+        f"**Objective**: {gdp_result.objective}  ",
+        f"**Configurations Evaluated**: {gdp_result.num_configs_evaluated}  ",
+        f"**Total Runtime**: {gdp_result.total_elapsed_s:.1f}s",
+        "",
+        "---",
+        "",
+    ]
+
+    # ── Section 1: Topology Ranking ──────────────────────────────────
+    lines.append("## 1. Topology Ranking")
+    lines.append("")
+    lines.append("| Rank | Active Units | OPEX ($) | LCA (kgCO₂e) | Recovery | Status |")
+    lines.append("|:----:|-------------|--------:|-------------:|---------:|:------:|")
+
+    successful = sorted(
+        [r for r in gdp_result.all_results if r.status == "ok"],
+        key=lambda r: r.objective_value,
+    )
+    failed = [r for r in gdp_result.all_results if r.status != "ok"]
+
+    for rank, ev in enumerate(successful, 1):
+        active = ", ".join(sorted(ev.config.active_unit_ids))
+        opex = ev.kpis.get("overall.opex_USD", 0)
+        lca = ev.kpis.get("overall.lca_kg_CO2e", 0)
+        rec = ev.kpis.get("overall.recovery", 0)
+        badge = "🏆" if rank == 1 else "✅"
+        lines.append(
+            f"| {rank} {badge} | {active} | {opex:.2f} | {lca:.2f} | "
+            f"{rec:.2%} | OK |"
+        )
+
+    for ev in failed:
+        active = ", ".join(sorted(ev.config.active_unit_ids))
+        lines.append(f"| — | {active} | — | — | — | ❌ {ev.error[:40]} |")
+
+    lines.append("")
+
+    # ── Re-evaluate best for full stream states ──────────────────────
+    best = gdp_result.best
+    flowsheet = None
+    states = {}
+    best_kpis = {}
+
+    if best and superstructure_name in SUPERSTRUCTURE_REGISTRY:
+        try:
+            ss = SUPERSTRUCTURE_REGISTRY[superstructure_name]()
+            flowsheet = build_sub_flowsheet(ss, best.config)
+
+            # Apply optimized params if any
+            if best.optimized_params:
+                unit_map = {u.id: u for u in flowsheet.units}
+                for key, val in best.optimized_params.items():
+                    parts = key.split(".", 1)
+                    if len(parts) == 2 and parts[0] in unit_map:
+                        unit_map[parts[0]].params[parts[1]] = val
+
+            builder = IDAESFlowsheetBuilder(database_name=database)
+            sim = builder.build_and_solve(flowsheet)
+            if sim.get("status") == "ok":
+                states = sim.get("states", {})
+                best_kpis = sim.get("kpis", {})
+        except Exception as e:
+            _log.warning("Re-evaluation for report failed: %s", e)
+
+    if not best_kpis and best:
+        best_kpis = best.kpis
+
+    # ── Section 2: Best Configuration Summary ────────────────────────
+    if best:
+        lines.append("---")
+        lines.append("")
+        lines.append("## 2. Best Configuration — 🏆")
+        lines.append("")
+        lines.append(f"**Active units**: {', '.join(sorted(best.config.active_unit_ids))}  ")
+        if best.config.bypassed_unit_ids:
+            lines.append(f"**Bypassed units**: {', '.join(sorted(best.config.bypassed_unit_ids))}  ")
+        if best.config.stage_choices:
+            stages = ", ".join(f"{k}={v}" for k, v in best.config.stage_choices.items())
+            lines.append(f"**Stage choices**: {stages}  ")
+        lines.append("")
+
+        if flowsheet:
+            for unit in flowsheet.units:
+                params_str = ", ".join(
+                    f"`{k}={v}`" for k, v in (unit.params or {}).items()
+                    if not isinstance(v, dict)
+                )
+                lines.append(f"- **{unit.id}** (`{unit.type}`): {params_str}")
+            lines.append("")
+
+        if best.optimized_params:
+            lines.append("### Optimized Continuous Parameters")
+            lines.append("")
+            lines.append("| Parameter | Value |")
+            lines.append("|-----------|------:|")
+            for k, v in best.optimized_params.items():
+                lines.append(f"| `{k}` | {v:.4f} |")
+            lines.append("")
+
+    # ── Section 3: Process Flowsheet (PNG) ───────────────────────────
+    if flowsheet and states:
+        lines.append("## 3. Process Flowsheet")
+        lines.append("")
+        try:
+            img_path = _render_flowsheet_png(flowsheet, states, output_dir, ts_str)
+            rel_img = os.path.basename(img_path)
+            lines.append(f"![Process Flow Diagram]({rel_img})")
+        except Exception as e:
+            lines.append(f"*Flowsheet rendering failed: {e}*")
+        lines.append("")
+
+    # ── Section 4: Stream State Table ────────────────────────────────
+    if states and flowsheet:
+        produced = {s for u in flowsheet.units for s in u.outputs}
+        consumed = {s for u in flowsheet.units for s in u.inputs}
+        terminal_products = {o for u in flowsheet.units for o in u.outputs if o not in consumed}
+        feed_names = [s.name for s in flowsheet.streams if s.name not in produced]
+
+        lines.append("## 4. Stream States")
+        lines.append("")
+        lines.append("| Stream | Type | T (K) | P (Pa) | Flow (mol) | Mass (kg) | pH | Top Species (mol) |")
+        lines.append("|--------|------|------:|-------:|-----------:|----------:|---:|-------------------|")
+
+        for name, st in states.items():
+            if hasattr(st, "temperature_K"):
+                temp = f"{st.temperature_K:.1f}"
+                pres = f"{st.pressure_Pa:.0f}"
+                flow = f"{st.flow_mol:.1f}"
+                ph = f"{st.pH:.2f}" if st.pH is not None else "—"
+            elif isinstance(st, dict):
+                temp = f"{st.get('temperature_K', 298.15):.1f}"
+                pres = f"{st.get('pressure_Pa', 101325):.0f}"
+                flow = f"{st.get('flow_mol', 0):.1f}"
+                ph_val = st.get('pH')
+                ph = f"{ph_val:.2f}" if ph_val is not None else "—"
+            else:
+                continue
+
+            sp_amounts = _get_species_amounts(st)
+            mass = _species_mass_kg(sp_amounts)
+            top = _top_species(sp_amounts, n=3)
+            top_str = ", ".join(f"{sp} ({amt:.1f})" for sp, amt in top)
+
+            if name in feed_names:
+                stype = "**Feed**"
+            elif name in terminal_products:
+                stype = "Product"
+            else:
+                stype = "Internal"
+
+            lines.append(f"| {name} | {stype} | {temp} | {pres} | {flow} | {mass:.2f} | {ph} | {top_str} |")
+
+        lines.append("")
+
+        # ── Section 5: Mass Balance & Metrics ────────────────────────
+        feed_total_mass_kg = 0.0
+        feed_ree_mass_kg = 0.0
+        for f in feed_names:
+            if f in states:
+                sp = _get_species_amounts(states[f])
+                feed_total_mass_kg += _species_mass_kg(sp)
+                feed_ree_mass_kg += _ree_mass_kg(sp)
+
+        product_valuable_kg = 0.0
+        product_waste_kg = 0.0
+        product_total_kg = 0.0
+        product_value_usd = 0.0
+
+        for name in terminal_products:
+            if name in states:
+                sp = _get_species_amounts(states[name])
+                product_valuable_kg += _ree_mass_kg(sp)
+                product_waste_kg += _waste_mass_kg(sp)
+                product_total_kg += _species_mass_kg(sp)
+                product_value_usd += _ree_value_usd(sp)
+
+        opex = best_kpis.get("overall.opex_USD", 0)
+        lca = best_kpis.get("overall.lca_kg_CO2e", 0)
+        recovery = best_kpis.get("overall.recovery", 0)
+
+        lines.append("## 5. Output-Specific Performance")
+        lines.append("")
+
+        # Mass balance table
+        lines.append("### Mass Balance")
+        lines.append("")
+        lines.append("| Category | Mass (kg) | Fraction |")
+        lines.append("|----------|----------:|---------:|")
+        lines.append(f"| Feed (total input) | {feed_total_mass_kg:.2f} | 100.0% |")
+        if feed_total_mass_kg > 0:
+            lines.append(f"| Feed (REE content) | {feed_ree_mass_kg:.2f} | {feed_ree_mass_kg / feed_total_mass_kg * 100:.2f}% |")
+        else:
+            lines.append("| Feed (REE content) | 0.00 | — |")
+        lines.append(f"| **Product (valuable REE)** | **{product_valuable_kg:.2f}** | — |")
+        lines.append(f"| Product (waste/residual) | {product_waste_kg:.2f} | — |")
+        lines.append(f"| Product (total) | {product_total_kg:.2f} | — |")
+        lines.append("")
+
+        # Output-normalized economics
+        lines.append("### Economic & Environmental Metrics")
+        lines.append("")
+        lines.append("| Metric | Value |")
+        lines.append("|--------|------:|")
+        lines.append(f"| Overall Recovery | {recovery * 100:.1f}% |")
+
+        if product_valuable_kg > 1e-6:
+            lines.append(f"| **OPEX / kg REE product** | **${opex / product_valuable_kg:.4f}/kg** |")
+            lines.append(f"| **LCA / kg REE product** | **{lca / product_valuable_kg:.4f} kg CO₂e/kg** |")
+        if product_total_kg > 1e-6:
+            lines.append(f"| OPEX / kg total product | ${opex / product_total_kg:.4f}/kg |")
+            lines.append(f"| LCA / kg total product | {lca / product_total_kg:.4f} kg CO₂e/kg |")
+        if feed_total_mass_kg > 1e-6:
+            lines.append(f"| **Estimated REE value / kg ore** | **${product_value_usd / feed_total_mass_kg:.4f}/kg ore** |")
+            lines.append(f"| OPEX / kg ore (input) | ${opex / feed_total_mass_kg:.6f}/kg ore |")
+            lines.append(f"| Net value / kg ore | ${(product_value_usd - opex) / feed_total_mass_kg:.4f}/kg ore |")
+        lines.append(f"| REE product value (absolute) | ${product_value_usd:.2f} |")
+        lines.append(f"| OPEX (absolute) | ${opex:.2f} |")
+        lines.append(f"| LCA (absolute) | {lca:.2f} kg CO₂e |")
+        lines.append("")
+
+        # Per-unit recoveries
+        unit_kpis = {k: v for k, v in best_kpis.items()
+                     if ".recovery" in k and "overall" not in k}
+        if unit_kpis:
+            lines.append("### Per-Unit Recovery")
+            lines.append("")
+            lines.append("| Unit | Recovery |")
+            lines.append("|------|----------|")
+            for k, v in unit_kpis.items():
+                lines.append(f"| {k.replace('.recovery', '')} | {v * 100:.1f}% |")
+            lines.append("")
+
+    # ── Section 6: All Configurations (Detail) ───────────────────────
+    if len(successful) > 1:
+        lines.append("---")
+        lines.append("")
+        lines.append("## 6. All Configurations (Comparison)")
+        lines.append("")
+        for rank, ev in enumerate(successful, 1):
+            active = ", ".join(sorted(ev.config.active_unit_ids))
+            bypassed = ", ".join(sorted(ev.config.bypassed_unit_ids)) or "none"
+            badge = " 🏆" if rank == 1 else ""
+            lines.append(f"### Config #{rank}{badge}: [{active}]")
+            lines.append("")
+            lines.append(f"- **Bypassed**: {bypassed}")
+            lines.append(f"- **Objective**: {ev.objective_value:.4f}")
+            lines.append(f"- **Runtime**: {ev.elapsed_s:.2f}s")
+
+            if ev.kpis:
+                lines.append("")
+                lines.append("| KPI | Value |")
+                lines.append("|-----|------:|")
+                for k, v in sorted(ev.kpis.items()):
+                    val = f"{v:.4f}" if isinstance(v, float) else str(v)
+                    lines.append(f"| `{k}` | {val} |")
+            lines.append("")
+
+    # ── Write ────────────────────────────────────────────────────────
+    report = "\n".join(lines)
+    with open(output_path, "w") as f:
+        f.write(report)
+
+    return report, output_path
