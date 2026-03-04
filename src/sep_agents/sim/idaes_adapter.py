@@ -153,9 +153,11 @@ class IDAESFlowsheetBuilder:
         Reaktoro thermodynamic database (default ``"SUPRCRT - BL"``).
     """
 
-    def __init__(self, database_name: str = "SUPRCRT - BL"):
+    def __init__(self, database_name: str = "SUPRCRT - BL", use_jax: bool = False):
         self.database_name = database_name
+        self.use_jax = use_jax
         self._rkt_system = None
+        self._jax_solver = None
 
     # -- public API ----------------------------------------------------------
 
@@ -465,9 +467,13 @@ class IDAESFlowsheetBuilder:
         """
         inlet = self._merge_inlets(inlets)
 
-        if not REAKTORO_AVAILABLE:
+        if not REAKTORO_AVAILABLE and not self.use_jax:
             _log.warning("Reaktoro unavailable; reactor %s is pass-through", unit.id)
             return self._solve_passthrough(unit, {unit.inputs[0]: inlet})
+
+        # --- JAX backend ---
+        if self.use_jax:
+            return self._solve_reactor_jax(unit, inlet)
 
         # Override T/P from unit params if provided
         T_K = inlet.temperature_K
@@ -548,6 +554,47 @@ class IDAESFlowsheetBuilder:
             outlet.Eh_mV = float(aprops.Eh()) * 1000.0
         except Exception:
             pass
+
+        outlets = {}
+        for out_name in unit.outputs:
+            outlets[out_name] = outlet.copy()
+        return outlets
+
+    def _solve_reactor_jax(
+        self, unit: UnitOp, inlet: StreamState,
+    ) -> Dict[str, StreamState]:
+        """JAX-based equilibrium solve for a reactor unit."""
+        from .jax_equilibrium import JaxEquilibriumSolver
+
+        T_K = inlet.temperature_K
+        P_Pa = inlet.pressure_Pa
+        if "T_C" in unit.params:
+            T_K = float(unit.params["T_C"]) + 273.15
+        if "T_K" in unit.params:
+            T_K = float(unit.params["T_K"])
+        if "P_Pa" in unit.params:
+            P_Pa = float(unit.params["P_Pa"])
+        if "p_bar" in unit.params:
+            P_Pa = float(unit.params["p_bar"]) * 1e5
+
+        jax_system = self._get_rkt_system()  # returns ChemicalSystemData when use_jax=True
+        if self._jax_solver is None:
+            self._jax_solver = JaxEquilibriumSolver(jax_system)
+
+        result = self._jax_solver.solve(T_K, P_Pa, inlet.species_amounts)
+
+        if result["status"] != "ok":
+            _log.warning("JAX equilibrium failed for unit %s: %s", unit.id, result.get("error"))
+            return self._solve_passthrough(unit, {unit.inputs[0]: inlet})
+
+        outlet = StreamState(
+            temperature_K=T_K,
+            pressure_Pa=P_Pa,
+            flow_mol=inlet.flow_mol,
+        )
+        outlet.species_amounts = dict(result["species_amounts"])
+        outlet.pH = result.get("pH")
+        outlet.Eh_mV = (result.get("Eh_V", 0.0) or 0.0) * 1000.0
 
         outlets = {}
         for out_name in unit.outputs:
@@ -769,6 +816,12 @@ class IDAESFlowsheetBuilder:
         GeoH2 databases (``"SUPRCRT - BL"`` etc.), or a minimal fallback.
         """
         if self._rkt_system is not None:
+            return self._rkt_system
+
+        # Check for JAX mode first
+        if self.use_jax:
+            from .jax_equilibrium import build_jax_system
+            self._rkt_system = build_jax_system(preset=self.database_name)
             return self._rkt_system
 
         # Check for REE preset

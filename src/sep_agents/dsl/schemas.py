@@ -30,6 +30,27 @@ UNIT_PARAM_SPEC = {
         "req": [],
         "opt": ["recovery", "underflow_solids_frac", "overflow_clarity"],
     },
+    # ── Geological process units ──────────────────────────────────────
+    "heat_exchanger": {
+        "req": ["U_Wm2K", "area_m2"],
+        "opt": ["dT_approach_K", "type"],  # type: "counter" or "parallel"
+    },
+    "pump": {
+        "req": ["head_m", "efficiency"],
+        "opt": ["power_kW", "type"],  # type: "centrifugal" or "positive_displacement"
+    },
+    "carbonation_reactor": {
+        "req": ["residence_time_s", "T_C", "p_bar"],
+        "opt": ["conversion", "tank_volume_m3", "agitation_power_kW"],
+    },
+    "serpentinization_reactor": {
+        "req": ["residence_time_s", "T_C", "p_bar"],
+        "opt": ["conversion", "tank_volume_m3", "agitation_power_kW"],
+    },
+    "separator": {
+        "req": [],
+        "opt": ["recovery", "split_fraction"],
+    },
 }
 class PSD(BaseModel):
     bins_um: List[float] = Field(..., description="Upper size in microns for each bin")

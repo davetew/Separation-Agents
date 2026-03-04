@@ -107,68 +107,90 @@ def _get_species_amounts(st) -> Dict[str, float]:
     return {}
 
 
-def _render_flowsheet_png(flowsheet, states, output_dir: str, timestamp: str) -> str:
-    """Render a process flow diagram as a PNG using matplotlib."""
+def _render_flowsheet_diagram(
+    flowsheet, states, output_dir: str, timestamp: str,
+    formats: tuple = ("png", "svg"),
+) -> dict:
+    """Render IDAES-style process flow diagram with engineering symbols.
+
+    Returns dict mapping format -> file path, e.g. {"png": "...", "svg": "..."}.
+    """
     import matplotlib
     matplotlib.use("Agg")
     import matplotlib.pyplot as plt
     import matplotlib.patches as mpatches
-    from matplotlib.patches import FancyArrowPatch
+    from matplotlib.patches import FancyArrowPatch, FancyBboxPatch, Circle
+    import numpy as np
 
+    # ── Unit type classification ─────────────────────────────────────
+    REACTOR_TYPES = {"serpentinization_reactor", "carbonation_reactor",
+                     "leach_reactor", "reactor", "leach"}
+    HX_TYPES = {"heat_exchanger"}
+    PUMP_TYPES = {"pump", "compressor"}
+    SEP_TYPES = {"separator", "magnetic_separator", "flotation",
+                 "flotation_bank", "cyclone", "thickener", "filter"}
+    SX_TYPES_ = {"solvent_extraction", "sx", "ion_exchange", "ix"}
+    MIXER_TYPES = {"mixer", "mill"}
+    PRECIP_TYPES = {"precipitator", "crystallizer"}
+
+    # IDAES-style color palette
+    UNIT_STYLES = {
+        "reactor":  {"face": "#FF8C42", "edge": "#C5612A", "text": "white",   "icon": "⚗"},
+        "hx":       {"face": "#4A90D9", "edge": "#2C5F8A", "text": "white",   "icon": "≋"},
+        "pump":     {"face": "#50C878", "edge": "#2E7D46", "text": "white",   "icon": "△"},
+        "separator":{"face": "#9B72AA", "edge": "#6B4C7A", "text": "white",   "icon": "⊥"},
+        "sx":       {"face": "#26A69A", "edge": "#00796B", "text": "white",   "icon": "⇆"},
+        "mixer":    {"face": "#90A4AE", "edge": "#607D8B", "text": "white",   "icon": "⊕"},
+        "precip":   {"face": "#E57373", "edge": "#C62828", "text": "white",   "icon": "◇"},
+        "default":  {"face": "#BDBDBD", "edge": "#757575", "text": "black",   "icon": "□"},
+        "feed":     {"face": "#E3F2FD", "edge": "#1565C0", "text": "#1565C0", "icon": ""},
+        "product":  {"face": "#E8F5E9", "edge": "#2E7D32", "text": "#2E7D32", "icon": ""},
+    }
+
+    def _classify(utype: str) -> str:
+        utype = utype.lower()
+        if utype in REACTOR_TYPES:   return "reactor"
+        if utype in HX_TYPES:        return "hx"
+        if utype in PUMP_TYPES:      return "pump"
+        if utype in SEP_TYPES:       return "separator"
+        if utype in SX_TYPES_:       return "sx"
+        if utype in MIXER_TYPES:     return "mixer"
+        if utype in PRECIP_TYPES:    return "precip"
+        return "default"
+
+    # ── Topology ─────────────────────────────────────────────────────
     produced = {s for u in flowsheet.units for s in u.outputs}
     consumed = {s for u in flowsheet.units for s in u.inputs}
-
-    # Build topology: feeds -> (unit, intermediates, unit, ...) -> products
-    # We lay out in a two-row staggered grid:
-    #   Row 0 (y=0): feed(s), unit(s), product(s) — main spine
-    #   Row 1 (y=-offset): secondary product outlets branch down
-
     feeds = [s.name for s in flowsheet.streams if s.name not in produced]
     unit_ids = [u.id for u in flowsheet.units]
     unit_map = {u.id: u for u in flowsheet.units}
 
-    # Collect intermediates
     intermediates = {}
     for u in flowsheet.units:
         for out in u.outputs:
             if out in consumed:
                 intermediates[out] = u.id
 
-    # Collect products per unit
-    products_by_unit = {}
-    for u in flowsheet.units:
-        for out in u.outputs:
-            if out not in consumed:
-                products_by_unit.setdefault(u.id, []).append(out)
-
-    # Assign x positions along the main spine
-    # Key rule: intermediates (consumed by downstream) stay on the main spine,
-    # terminal products branch off vertically.
-    x_step = 4.5
-    node_pos = {}  # name -> (x, y)
+    # ── Layout: hierarchical left-to-right ───────────────────────────
+    x_step = 5.0
+    y_branch = -3.5
+    node_pos = {}
     x = 0.0
 
-    # Feeds
     for f in feeds:
         node_pos[f] = (x, 0.0)
         x += x_step
 
-    # Units and their outputs
     for uid in unit_ids:
         node_pos[uid] = (x, 0.0)
         unit_obj = unit_map[uid]
+        branch_outs = [o for o in unit_obj.outputs if o not in consumed]
 
-        # Separate outputs into those consumed downstream vs terminal products
-        spine_outs = [o for o in unit_obj.outputs if o in consumed]  # intermediates
-        branch_outs = [o for o in unit_obj.outputs if o not in consumed]  # products
-
-        # Place branches below the unit, staggered horizontally
         for j, p in enumerate(branch_outs):
-            node_pos[p] = (x + x_step * (0.3 + 0.8 * j), -3.2 * (j + 1))
-
+            node_pos[p] = (x + x_step * (0.3 + 0.8 * j), y_branch * (j + 1))
         x += x_step
 
-    # Collect all edges
+    # ── Edges ────────────────────────────────────────────────────────
     edges = []
     for u in flowsheet.units:
         for inp in u.inputs:
@@ -179,80 +201,194 @@ def _render_flowsheet_png(flowsheet, states, output_dir: str, timestamp: str) ->
             if out in node_pos:
                 edges.append((u.id, out, out))
 
-    # Figure sizing
+    # ── Figure ───────────────────────────────────────────────────────
     all_x = [p[0] for p in node_pos.values()]
     all_y = [p[1] for p in node_pos.values()]
-    fig_w = max(14, (max(all_x) - min(all_x)) + 8)
-    fig_h = max(6, (max(all_y) - min(all_y)) + 6)
+    fig_w = max(16, (max(all_x) - min(all_x)) + 10)
+    fig_h = max(8, (max(all_y) - min(all_y)) + 8)
 
     fig, ax = plt.subplots(1, 1, figsize=(fig_w, fig_h))
-    ax.set_xlim(min(all_x) - 3, max(all_x) + 3)
-    ax.set_ylim(min(all_y) - 3, max(all_y) + 3)
+    ax.set_xlim(min(all_x) - 4, max(all_x) + 4)
+    ax.set_ylim(min(all_y) - 4, max(all_y) + 4)
     ax.set_aspect("equal")
     ax.axis("off")
-    ax.set_title(f"Process Flow Diagram — {flowsheet.name}\n{timestamp}",
-                 fontsize=14, fontweight="bold", pad=15)
+    fig.patch.set_facecolor("white")
 
-    bw, bh = 3.0, 1.6  # box width, height
+    # Title bar
+    ax.text(
+        (min(all_x) + max(all_x)) / 2, max(all_y) + 3.0,
+        f"Process Flow Diagram — {flowsheet.name}",
+        ha="center", va="center", fontsize=16, fontweight="bold",
+        fontfamily="sans-serif", color="#263238",
+    )
+    ax.text(
+        (min(all_x) + max(all_x)) / 2, max(all_y) + 2.3,
+        f"Generated {timestamp}  •  {len(flowsheet.units)} units  •  "
+        f"{len(flowsheet.streams)} streams",
+        ha="center", va="center", fontsize=10, color="#78909C",
+        fontfamily="sans-serif",
+    )
 
-    def _node_type(name):
-        if name in [f for f in feeds]:
-            return "feed"
-        elif name in unit_ids:
-            return "unit"
-        else:
-            return "product"
+    bw, bh = 3.4, 1.8  # box dimensions
 
-    _colors = {
-        "feed":    ("#4a90d9", "#2c5f8a", "white"),
-        "unit":    ("#f5a623", "#c17d12", "white"),
-        "product": ("#7ed321", "#3d7a0a", "white"),
-    }
-
-    # Draw boxes
+    # ── Draw unit blocks ─────────────────────────────────────────────
     for name, (cx, cy) in node_pos.items():
-        ntype = _node_type(name)
-        face, edge, txtc = _colors[ntype]
-        rounding = "round,pad=0.2" if ntype != "unit" else "square,pad=0.15"
-        box = mpatches.FancyBboxPatch(
+        is_unit = name in unit_ids
+        is_feed = name in feeds
+
+        if is_unit:
+            utype = _classify(unit_map[name].type)
+            style = UNIT_STYLES[utype]
+            boxstyle = "round,pad=0.3"
+        elif is_feed:
+            style = UNIT_STYLES["feed"]
+            boxstyle = "round,pad=0.4"
+        else:
+            style = UNIT_STYLES["product"]
+            boxstyle = "round,pad=0.4"
+
+        # Main box
+        box = FancyBboxPatch(
             (cx - bw / 2, cy - bh / 2), bw, bh,
-            boxstyle=rounding, facecolor=face, edgecolor=edge, lw=2
+            boxstyle=boxstyle,
+            facecolor=style["face"], edgecolor=style["edge"],
+            lw=2.5, zorder=2,
         )
         ax.add_patch(box)
 
-        # Label inside box
-        if ntype == "unit":
-            label = f"{name}\n({unit_map[name].type})"
-        elif ntype == "feed":
-            label = f"{name}\n(Feed)"
-        else:
-            label = f"{name}\n(Product)"
-        ax.text(cx, cy, label, ha="center", va="center",
-                fontsize=11, fontweight="bold", color=txtc)
+        # For reactors, add double-border effect (IDAES convention)
+        if is_unit and _classify(unit_map[name].type) == "reactor":
+            inner = FancyBboxPatch(
+                (cx - bw / 2 + 0.12, cy - bh / 2 + 0.12),
+                bw - 0.24, bh - 0.24,
+                boxstyle="round,pad=0.2",
+                facecolor="none", edgecolor=style["edge"],
+                lw=1.2, zorder=3, linestyle="--",
+            )
+            ax.add_patch(inner)
 
-        # Stream annotation below box
+        # For heat exchangers, add circle overlay (IDAES HX symbol)
+        if is_unit and _classify(unit_map[name].type) == "hx":
+            circ = Circle(
+                (cx, cy), radius=0.55, facecolor="none",
+                edgecolor=style["edge"], lw=1.8, zorder=3,
+            )
+            ax.add_patch(circ)
+            # Diagonal line through circle
+            ax.plot(
+                [cx - 0.35, cx + 0.35], [cy - 0.35, cy + 0.35],
+                color=style["edge"], lw=1.5, zorder=4,
+            )
+
+        # For pumps, add triangle indicator
+        if is_unit and _classify(unit_map[name].type) == "pump":
+            triangle = plt.Polygon(
+                [(cx - 0.4, cy - 0.4), (cx + 0.5, cy), (cx - 0.4, cy + 0.4)],
+                facecolor="none", edgecolor=style["edge"],
+                lw=1.5, zorder=3, closed=True,
+            )
+            ax.add_patch(triangle)
+
+        # ── Labels ───────────────────────────────────────────────────
+        if is_unit:
+            unit_obj = unit_map[name]
+            # ID above, type below
+            ax.text(
+                cx, cy + 0.25, name,
+                ha="center", va="center", fontsize=10,
+                fontweight="bold", color=style["text"], zorder=5,
+                fontfamily="sans-serif",
+            )
+            ax.text(
+                cx, cy - 0.30,
+                f"({unit_obj.type.replace('_', ' ').title()})",
+                ha="center", va="center", fontsize=8,
+                color=style["text"], zorder=5,
+                fontfamily="sans-serif", fontstyle="italic",
+            )
+        elif is_feed:
+            ax.text(
+                cx, cy + 0.15, name,
+                ha="center", va="center", fontsize=10,
+                fontweight="bold", color=style["text"], zorder=5,
+                fontfamily="sans-serif",
+            )
+            ax.text(
+                cx, cy - 0.30, "FEED",
+                ha="center", va="center", fontsize=8,
+                color=style["text"], zorder=5,
+                fontfamily="sans-serif",
+            )
+        else:
+            ax.text(
+                cx, cy + 0.15, name,
+                ha="center", va="center", fontsize=10,
+                fontweight="bold", color=style["text"], zorder=5,
+                fontfamily="sans-serif",
+            )
+            ax.text(
+                cx, cy - 0.30, "PRODUCT",
+                ha="center", va="center", fontsize=8,
+                color=style["text"], zorder=5,
+                fontfamily="sans-serif",
+            )
+
+        # ── Stream condition annotation ──────────────────────────────
         if name in states:
             sp = _get_species_amounts(states[name])
-            top = _top_species(sp, n=2)
-            mass = _species_mass_kg(sp)
-            if top:
-                ann_parts = [f"{s}: {a:.1f} mol" for s, a in top]
-                ann = "\n".join(ann_parts)
-                ann += f"\n({mass:.1f} kg total)"
-            else:
-                ann = f"({mass:.1f} kg total)"
-            ax.text(cx, cy - bh / 2 - 0.2, ann,
-                    ha="center", va="top", fontsize=8, color="#444",
-                    linespacing=1.3)
+            ann_parts = []
+            # Temperature + Pressure from stream definition
+            stream_def = next(
+                (s for s in flowsheet.streams if s.name == name), None
+            )
+            if stream_def:
+                if stream_def.temperature_K and stream_def.temperature_K != 298.15:
+                    ann_parts.append(f"T={stream_def.temperature_K - 273.15:.0f}°C")
+                if stream_def.pressure_Pa and stream_def.pressure_Pa != 101325.0:
+                    p_bar = stream_def.pressure_Pa / 1e5
+                    ann_parts.append(f"P={p_bar:.0f} bar")
 
-    # Draw arrows between boxes (connecting edge-to-edge, not center-to-center)
+            top = _top_species(sp, n=2)
+            for s_, a_ in top:
+                ann_parts.append(f"{s_}: {a_:.1f}")
+
+            mass = _species_mass_kg(sp)
+            if mass > 0.001:
+                ann_parts.append(f"({mass:.1f} kg)")
+
+            if ann_parts:
+                ax.text(
+                    cx, cy - bh / 2 - 0.25, "\n".join(ann_parts),
+                    ha="center", va="top", fontsize=7.5, color="#546E7A",
+                    linespacing=1.4, zorder=5, fontfamily="sans-serif",
+                    bbox=dict(boxstyle="round,pad=0.2", facecolor="white",
+                              edgecolor="#CFD8DC", alpha=0.9),
+                )
+        elif not is_unit:
+            # For non-state nodes, show stream conditions from definition
+            stream_def = next(
+                (s for s in flowsheet.streams if s.name == name), None
+            )
+            if stream_def:
+                ann_parts = []
+                if stream_def.temperature_K and stream_def.temperature_K != 298.15:
+                    ann_parts.append(f"T={stream_def.temperature_K - 273.15:.0f}°C")
+                if stream_def.pressure_Pa and stream_def.pressure_Pa != 101325.0:
+                    p_bar = stream_def.pressure_Pa / 1e5
+                    ann_parts.append(f"P={p_bar:.0f} bar")
+                if ann_parts:
+                    ax.text(
+                        cx, cy - bh / 2 - 0.2, " · ".join(ann_parts),
+                        ha="center", va="top", fontsize=7.5, color="#78909C",
+                        zorder=5, fontfamily="sans-serif",
+                    )
+
+    # ── Draw stream arrows ───────────────────────────────────────────
     for src, dst, stream_label in edges:
         sx, sy = node_pos[src]
         dx, dy = node_pos[dst]
 
-        # Determine connection points on box edges
         if abs(dx - sx) > abs(dy - sy):
-            # Horizontal dominant
             if dx > sx:
                 x1, y1 = sx + bw / 2, sy
                 x2, y2 = dx - bw / 2, dy
@@ -260,7 +396,6 @@ def _render_flowsheet_png(flowsheet, states, output_dir: str, timestamp: str) ->
                 x1, y1 = sx - bw / 2, sy
                 x2, y2 = dx + bw / 2, dy
         else:
-            # Vertical dominant
             if dy > sy:
                 x1, y1 = sx, sy + bh / 2
                 x2, y2 = dx, dy - bh / 2
@@ -268,33 +403,89 @@ def _render_flowsheet_png(flowsheet, states, output_dir: str, timestamp: str) ->
                 x1, y1 = sx, sy - bh / 2
                 x2, y2 = dx, dy + bh / 2
 
+        rad = 0.0 if abs(dy - sy) < 0.1 else 0.15
         arrow = FancyArrowPatch(
             (x1, y1), (x2, y2),
             arrowstyle="-|>",
-            mutation_scale=18,
+            mutation_scale=20,
             lw=2.0,
-            color="#555",
-            connectionstyle="arc3,rad=0.0" if abs(dy - sy) < 0.1 else "arc3,rad=0.2",
+            color="#37474F",
+            connectionstyle=f"arc3,rad={rad}",
+            zorder=1,
         )
         ax.add_patch(arrow)
 
         # Stream label on the arrow
         mx = (x1 + x2) / 2
         my = (y1 + y2) / 2
-        offset_y = 0.3 if abs(dy - sy) < 0.1 else 0.0
-        offset_x = 0.0 if abs(dy - sy) < 0.1 else 0.5
-        ax.text(mx + offset_x, my + offset_y, stream_label,
-                ha="center", va="bottom", fontsize=9,
-                fontstyle="italic", color="#888",
-                bbox=dict(boxstyle="round,pad=0.15", facecolor="white",
-                          edgecolor="#ddd", alpha=0.85))
+        offset_y = 0.35 if abs(dy - sy) < 0.1 else 0.0
+        offset_x = 0.0 if abs(dy - sy) < 0.1 else 0.6
+        ax.text(
+            mx + offset_x, my + offset_y, stream_label,
+            ha="center", va="bottom", fontsize=8,
+            fontstyle="italic", color="#607D8B",
+            fontfamily="sans-serif",
+            bbox=dict(boxstyle="round,pad=0.12", facecolor="white",
+                      edgecolor="#ECEFF1", alpha=0.92),
+            zorder=6,
+        )
 
-    plt.tight_layout()
-    img_name = f"flowsheet_diagram_{timestamp.replace(' ', '_').replace(':', '').replace('-', '')}.png"
-    img_path = os.path.join(output_dir, img_name)
-    fig.savefig(img_path, dpi=150, bbox_inches="tight", facecolor="white")
+    # ── Legend ────────────────────────────────────────────────────────
+    seen_categories = set()
+    for u in flowsheet.units:
+        seen_categories.add(_classify(u.type))
+
+    legend_items = []
+    legend_labels = {
+        "reactor": "Reactor", "hx": "Heat Exchanger", "pump": "Pump/Compressor",
+        "separator": "Separator", "sx": "SX / IX", "mixer": "Mixer",
+        "precip": "Precipitator", "default": "Other",
+    }
+    for cat in ["reactor", "hx", "pump", "separator", "sx", "mixer", "precip", "default"]:
+        if cat in seen_categories:
+            s = UNIT_STYLES[cat]
+            legend_items.append(
+                mpatches.Patch(facecolor=s["face"], edgecolor=s["edge"],
+                               lw=1.5, label=legend_labels[cat])
+            )
+    # Add feed/product
+    s = UNIT_STYLES["feed"]
+    legend_items.append(
+        mpatches.Patch(facecolor=s["face"], edgecolor=s["edge"],
+                       lw=1.5, label="Feed Stream")
+    )
+    s = UNIT_STYLES["product"]
+    legend_items.append(
+        mpatches.Patch(facecolor=s["face"], edgecolor=s["edge"],
+                       lw=1.5, label="Product Stream")
+    )
+
+    ax.legend(
+        handles=legend_items, loc="lower right", fontsize=8,
+        framealpha=0.95, edgecolor="#B0BEC5", fancybox=True,
+        title="Unit Types", title_fontsize=9,
+    )
+
+    plt.tight_layout(pad=2.0)
+
+    # ── Save in all requested formats ────────────────────────────────
+    ts_clean = timestamp.replace(' ', '_').replace(':', '').replace('-', '')
+    paths = {}
+    for fmt in formats:
+        fname = f"flowsheet_pfd_{ts_clean}.{fmt}"
+        fpath = os.path.join(output_dir, fname)
+        fig.savefig(fpath, dpi=150, bbox_inches="tight", facecolor="white",
+                    format=fmt)
+        paths[fmt] = fpath
+
     plt.close(fig)
-    return img_path
+    return paths
+
+
+def _render_flowsheet_png(flowsheet, states, output_dir: str, timestamp: str) -> str:
+    """Legacy wrapper: render PFD and return PNG path."""
+    paths = _render_flowsheet_diagram(flowsheet, states, output_dir, timestamp)
+    return paths.get("png", "")
 
 
 def generate_report(
@@ -386,15 +577,26 @@ def generate_report(
         lines.append(f"- **{unit.id}** (`{unit.type}`): {params_str}")
     lines.append("")
 
-    # ── Section 3: Process Flow Diagram ──────────────────────────────────
+    # ── Section 3: Process Flow Diagram (IDAES-style PFD) ────────────────
     lines.append("## 3. Process Flowsheet")
     lines.append("")
     try:
-        img_path = _render_flowsheet_png(flowsheet, states, output_dir, ts_str)
-        rel_img = os.path.basename(img_path)
-        lines.append(f"![Process Flow Diagram]({rel_img})")
+        diagram_paths = _render_flowsheet_diagram(
+            flowsheet, states, output_dir, ts_str,
+        )
+        if "png" in diagram_paths:
+            rel_png = os.path.basename(diagram_paths["png"])
+            lines.append(f"![Process Flow Diagram]({rel_png})")
+        if "svg" in diagram_paths:
+            rel_svg = os.path.basename(diagram_paths["svg"])
+            lines.append("")
+            lines.append(f"*Vector version: [{rel_svg}]({rel_svg})*")
     except Exception as e:
         lines.append(f"*Flowsheet rendering failed: {e}*")
+    lines.append("")
+    lines.append("> **IDAES Flowsheet Visualizer**: For interactive exploration, run ")
+    lines.append("> `model.fs.visualize(\"" + flowsheet.name + "\")` in a Jupyter notebook ")
+    lines.append("> (requires `idaes[ui]`). See [IDAES FV Tutorial](https://idaes-examples.readthedocs.io/en/2.2.0/docs/tut/ui/visualizer_tutorial_doc.html).")
     lines.append("")
 
     # ── Section 4: Stream State Table ────────────────────────────────────
@@ -681,16 +883,26 @@ def generate_gdp_report(
                 lines.append(f"| `{k}` | {v:.4f} |")
             lines.append("")
 
-    # ── Section 3: Process Flowsheet (PNG) ───────────────────────────
+    # ── Section 3: Process Flowsheet (IDAES-style PFD) ────────────────
     if flowsheet and states:
         lines.append("## 3. Process Flowsheet")
         lines.append("")
         try:
-            img_path = _render_flowsheet_png(flowsheet, states, output_dir, ts_str)
-            rel_img = os.path.basename(img_path)
-            lines.append(f"![Process Flow Diagram]({rel_img})")
+            diagram_paths = _render_flowsheet_diagram(
+                flowsheet, states, output_dir, ts_str,
+            )
+            if "png" in diagram_paths:
+                rel_png = os.path.basename(diagram_paths["png"])
+                lines.append(f"![Process Flow Diagram]({rel_png})")
+            if "svg" in diagram_paths:
+                rel_svg = os.path.basename(diagram_paths["svg"])
+                lines.append("")
+                lines.append(f"*Vector version: [{rel_svg}]({rel_svg})*")
         except Exception as e:
             lines.append(f"*Flowsheet rendering failed: {e}*")
+        lines.append("")
+        lines.append("> **IDAES Flowsheet Visualizer**: For interactive exploration, run ")
+        lines.append("> `model.fs.visualize(\"" + (flowsheet.name if flowsheet else superstructure_name) + "\")` in a Jupyter notebook.")
         lines.append("")
 
     # ── Section 4: Stream State Table ────────────────────────────────

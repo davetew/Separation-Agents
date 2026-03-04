@@ -49,6 +49,11 @@ PRECIPITATOR_TYPES = {"precipitator", "crystallizer"}
 PASSTHROUGH_TYPES = {"mixer", "mill", "separator", "magnetic_separator",
                      "flotation", "leach", "filter"}
 
+# Geological process units — pass-through in EO until full Pyomo models exist
+GEO_REACTOR_TYPES = {"serpentinization_reactor", "carbonation_reactor",
+                     "leach_reactor"}
+GEO_EQUIPMENT_TYPES = {"heat_exchanger", "pump"}
+
 # Background species that stay in aqueous phase during SX
 AQUEOUS_BACKGROUND = {"H2O", "HCl", "NaOH", "H2C2O4"}
 
@@ -218,7 +223,7 @@ class EOFlowsheetBuilder:
 
             return blk
 
-        elif utype in PASSTHROUGH_TYPES:
+        elif utype in PASSTHROUGH_TYPES | GEO_REACTOR_TYPES | GEO_EQUIPMENT_TYPES:
             # Simple pass-through: create trivial block with feed = output
             return self._build_passthrough(m, unit, comp_list)
 

@@ -342,11 +342,33 @@ class REEEquilibriumSolver:
         System preset (``"light_ree"``, ``"heavy_ree"``, ``"full_ree"``).
     database : str
         Reaktoro database name.
+    use_jax : bool
+        If True, use the JAX-based GEM solver instead of Reaktoro.
+        The JAX solver is fully differentiable via ``jax.grad`` and
+        does not require Reaktoro to be installed.
     """
 
-    def __init__(self, preset: str = "light_ree", database: str = "supcrtbl", extra_elements: Optional[Sequence[str]] = None):
-        self.system = build_ree_system(preset=preset, database=database, extra_elements=extra_elements)
-        self.solver = rkt.EquilibriumSolver(self.system)
+    def __init__(self, preset: str = "light_ree", database: str = "supcrtbl", extra_elements: Optional[Sequence[str]] = None, use_jax: bool = False):
+        self.use_jax = use_jax
+        self.preset = preset
+
+        if use_jax:
+            from ..sim.jax_equilibrium import build_jax_system, JaxEquilibriumSolver
+            self._jax_system = build_jax_system(preset=preset)
+            self._jax_solver = JaxEquilibriumSolver(self._jax_system)
+            self.system = None
+            self.solver = None
+        else:
+            if not REAKTORO_AVAILABLE:
+                raise ImportError(
+                    "Reaktoro is required when use_jax=False. "
+                    "Install via: conda install -c conda-forge reaktoro, "
+                    "or set use_jax=True to use the JAX backend."
+                )
+            self.system = build_ree_system(preset=preset, database=database, extra_elements=extra_elements)
+            self.solver = rkt.EquilibriumSolver(self.system)
+            self._jax_system = None
+            self._jax_solver = None
 
     def speciate(
         self,
@@ -380,6 +402,18 @@ class REEEquilibriumSolver:
             Keys: ``pH``, ``Eh_V``, ``species`` (sorted by amount),
             ``ree_distribution`` (REE species only).
         """
+        # --- JAX backend ---
+        if self.use_jax:
+            return self._jax_solver.solve_speciation(
+                temperature_C=temperature_C,
+                pressure_atm=pressure_atm,
+                water_kg=water_kg,
+                acid_mol=acid_mol,
+                ree_mol=ree_mol,
+                other_mol=other_mol,
+            )
+
+        # --- Reaktoro backend (original) ---
         state = rkt.ChemicalState(self.system)
         state.temperature(temperature_C, "celsius")
         state.pressure(pressure_atm, "atm")

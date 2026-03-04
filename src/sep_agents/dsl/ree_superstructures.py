@@ -248,6 +248,13 @@ SUPERSTRUCTURE_REGISTRY = {
     "simple_sx_precip": simple_sx_precipitator_superstructure,
 }
 
+# Merge geological superstructures
+try:
+    from .geo_superstructures import GEO_SUPERSTRUCTURE_REGISTRY
+    SUPERSTRUCTURE_REGISTRY.update(GEO_SUPERSTRUCTURE_REGISTRY)
+except ImportError:
+    pass  # geo_superstructures not yet available
+
 
 def list_superstructures() -> list[dict]:
     """List available predefined superstructures."""
