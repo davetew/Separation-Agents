@@ -1,0 +1,79 @@
+# Olivine Feed Characterization
+# Raw material: Natural olivine, 85% forsterite / 15% fayalite by volume
+# Converted to weight basis using mineral densities
+
+feed:
+  name: "olivine_feed"
+  description: "Natural olivine ore (85 vol% forsterite, 15 vol% fayalite)"
+  phase: "solid"
+  temperature_K: 298.15
+  pressure_Pa: 101325.0
+  throughput_tpd: 100.0  # assumed 100 t/d
+
+  # Mineralogy (wt%)
+  mineralogy:
+    forsterite_Mg2SiO4: 0.808
+    fayalite_Fe2SiO4: 0.192
+
+  # Oxide basis (wt%)
+  composition_wt:
+    MgO: 0.463
+    FeO: 0.135
+    SiO2: 0.402
+
+  # Molar composition per kg olivine
+  composition_mol_per_kg:
+    Mg2SiO4: 5.7464
+    Fe2SiO4: 0.9400
+
+  # Species amounts for IDAES stream (per 1000 mol basis)
+  species_amounts:
+    Mg2SiO4: 575.0
+    Fe2SiO4: 94.0
+    H2O: 55500.0  # 1 kg water as process medium
+
+# Auxiliary streams
+co2_feed:
+  name: "co2_feed"
+  phase: "gas"
+  temperature_K: 298.15
+  pressure_Pa: 101325.0
+  species_amounts:
+    CO2: 1200.0  # excess for carbonation
+
+water_feed:
+  name: "water_feed"
+  phase: "liquid"
+  temperature_K: 298.15
+  pressure_Pa: 101325.0
+  species_amounts:
+    H2O: 55500.0  # process water
+
+# Value streams identified
+value_streams:
+  - name: "CO2_mineralization"
+    trigger: "Forsterite > 20 mol% (85.9%)"
+    product: "MgCO3 + carbon credits"
+    price_per_t_co2: 60.0
+    estimated_revenue_per_t_ore: 25.80
+  - name: "H2_production"
+    trigger: "Fayalite present (14.1 mol%)"
+    product: "H2 gas via serpentinization"
+    price_per_kg: 4.0
+    estimated_revenue_per_t_ore: 3.54
+  - name: "iron_concentrate"
+    trigger: "Fe3O4 from serpentinization"
+    product: "Magnetite concentrate"
+    price_per_t: 120.0
+    estimated_revenue_per_t_ore: 12.19
+  - name: "construction_aggregate"
+    trigger: "Residual SiO2"
+    product: "Aggregate / fill"
+    price_per_t: 10.0
+
+# Commodity prices
+commodity_prices:
+  H2_green_per_kg: 4.00       # DOE target
+  CO2_credit_per_t: 60.00     # Voluntary market
+  Fe3O4_conc_per_t: 120.00    # FOB
+  aggregate_per_t: 10.00      # Local market

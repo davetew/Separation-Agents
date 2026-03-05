@@ -73,18 +73,46 @@ def estimate_opex_usd(flowsheet: Any, states: Dict[str, Any]) -> float:
             total_cost_usd += (vol_liters / 1000.0) * 0.05 # USD per cubic meter pumping proxy
 
     # 2. Unit Operational Energy Consumptions
+    elec_price = REAGENT_PRICES_USD_PER_KG["electricity_kWh"]
+    
     for unit in flowsheet.units:
-        # Example Proxy: Crystallizer Mixing and Cooling Energy
-        if unit.type in ["crystallizer", "precipitator"]:
+        # -- Pumps: use computed power (kW → kWh for 1-hour basis) --
+        if unit.type in ("pump",):
+            pwr_kw = float(unit.params.get("_power_kW", 0.0))
+            if pwr_kw > 0:
+                total_cost_usd += pwr_kw * elec_price  # kW * 1h = kWh
+        
+        # -- Heat exchangers: proxy thermal energy cost --
+        elif unit.type in ("heat_exchanger",):
+            duty_kw = float(unit.params.get("_duty_kW", 0.0))
+            if duty_kw > 0:
+                # Assume COP ~3.0 for heat pump / boiler efficiency ~0.85
+                thermal_kwh = duty_kw / 0.85  # primary energy
+                total_cost_usd += thermal_kwh * elec_price
+        
+        # -- Reactors: pressurized stirred tank energy proxy --
+        elif unit.type in ("equilibrium_reactor", "stoichiometric_reactor",
+                           "leach_reactor"):
+            agit_kw = float(unit.params.get("agitation_power_kW", 0.0))
+            if agit_kw > 0:
+                total_cost_usd += agit_kw * elec_price
+        
+        # -- Crystallizer / Precipitator --
+        elif unit.type in ["crystallizer", "precipitator"]:
             res_time = unit.params.get("residence_time_s", 3600.0)
             reagent_dos = unit.params.get("reagent_dosage_gpl", 10.0)
-            # Power scales with residence time and mixing requirement from dosage
             kwh = (res_time / 3600.0) * 5.0 + (reagent_dos * 0.1)
-            total_cost_usd += kwh * REAGENT_PRICES_USD_PER_KG["electricity_kWh"]
+            total_cost_usd += kwh * elec_price
+        
+        # -- Solvent extraction --
         elif unit.type == "solvent_extraction":
-            # Simplified proxy: Power scales with stages
             stages = unit.params.get("stages", 1)
             kwh = 2.0 * stages
-            total_cost_usd += kwh * REAGENT_PRICES_USD_PER_KG["electricity_kWh"]
+            total_cost_usd += kwh * elec_price
+        
+        # -- Magnetic separator (LIMS) --
+        elif unit.type in ("lims",):
+            # Typical LIMS power: 2–10 kW
+            total_cost_usd += 5.0 * elec_price
             
     return round(total_cost_usd, 2)

@@ -1,0 +1,399 @@
+\documentclass[aspectratio=169]{beamer}
+
+% --- Step Function Branding ---
+\usepackage{sf-branding}
+
+% --- Additional packages ---
+\usepackage{appendixnumberbeamer}
+\usepackage{amsmath,amssymb}
+\usepackage{siunitx}
+\sisetup{group-separator={,}, group-minimum-digits=4}
+\usepackage{graphicx}
+\usepackage{booktabs}
+\usepackage{tikz}
+\usetikzlibrary{arrows.meta,positioning,shapes.geometric}
+\usepackage{colortbl}
+
+% Project-specific colors
+\definecolor{revenue}{HTML}{00CC66}
+\definecolor{cost}{HTML}{EF4444}
+\definecolor{neutral}{HTML}{64748B}
+
+\title{Techno-Economic Assessment of\\[4pt] \textbf{Natural Olivine} Valorization}
+\subtitle{CO\textsubscript{2} Sequestration \(\cdot\) H\textsubscript{2} Production \(\cdot\) Iron Recovery}
+\author{Step Function}
+\date{\today}
+
+\begin{document}
+
+%──────────────────────────────────────────────────────────────────────
+\begin{frame}
+\titlepage
+\end{frame}
+
+%──────────────────────────────────────────────────────────────────────
+\begin{frame}{Outline}
+\tableofcontents
+\end{frame}
+
+%══════════════════════════════════════════════════════════════════════
+\section{Resource Characterization}
+%══════════════════════════════════════════════════════════════════════
+
+%──────────────────────────────────────────────────────────────────────
+\begin{frame}{Feed Composition}
+\framesub{Natural olivine: 85 vol\% forsterite, 15 vol\% fayalite}
+
+\begin{columns}[T]
+\begin{column}{0.48\textwidth}
+\textbf{Mineralogy}
+\begin{table}
+\centering\small
+\begin{tabular}{lcc}
+\toprule
+\textbf{Mineral} & \textbf{vol\%} & \textbf{wt\%} \\
+\midrule
+Forsterite (Mg\textsubscript{2}SiO\textsubscript{4}) & 85.0 & 80.8 \\
+Fayalite (Fe\textsubscript{2}SiO\textsubscript{4}) & 15.0 & 19.2 \\
+\bottomrule
+\end{tabular}
+\end{table}
+\end{column}
+\begin{column}{0.48\textwidth}
+\textbf{Oxide Basis}
+\begin{table}
+\centering\small
+\begin{tabular}{lc}
+\toprule
+\textbf{Oxide} & \textbf{wt\%} \\
+\midrule
+MgO & 46.3 \\
+SiO\textsubscript{2} & 40.2 \\
+FeO & 13.5 \\
+\bottomrule
+\end{tabular}
+\end{table}
+\end{column}
+\end{columns}
+
+\vspace{1em}
+\begin{itemize}
+\item Throughput: \SI{100}{t/d} (\SI{33000}{t/yr} at 330 operating days)
+\item No aqueous speciation required --- stoichiometric reactor paths only
+\end{itemize}
+\end{frame}
+
+%──────────────────────────────────────────────────────────────────────
+\begin{frame}{Value Streams Identified}
+\framesub{4 value streams from mineralogy analysis}
+
+\begin{table}
+\centering\small
+\begin{tabular}{lccc}
+\toprule
+\textbf{Value Stream} & \textbf{Product} & \textbf{Price} & \textbf{Est. Revenue (\$/t ore)} \\
+\midrule
+CO\textsubscript{2} mineralization & MgCO\textsubscript{3} + credits & \$60/t CO\textsubscript{2} & \textcolor{revenue}{\$25.80} \\
+Iron concentrate & Fe\textsubscript{3}O\textsubscript{4} magnetite & \$120/t & \textcolor{revenue}{\$12.19} \\
+H\textsubscript{2} production & H\textsubscript{2} gas & \$4,000/t & \textcolor{revenue}{\$3.54} \\
+Construction aggregate & SiO\textsubscript{2} fill & \$10/t & \textcolor{neutral}{\$1--2} \\
+\midrule
+\textbf{Total} & & & \textcolor{revenue}{\textbf{\$41.52}} \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\vspace{0.5em}
+\textcolor{StepYellow}{\textbf{Note:}} Revenue estimates assume 70\% Fe\textsubscript{2}SiO\textsubscript{4} conversion, 85\% Mg\textsubscript{2}SiO\textsubscript{4} conversion
+\end{frame}
+
+%══════════════════════════════════════════════════════════════════════
+\section{Process Design}
+%══════════════════════════════════════════════════════════════════════
+
+%──────────────────────────────────────────────────────────────────────
+\begin{frame}{Process Flow Diagram}
+\framesub{Series configuration: serpentinization \(\to\) carbonation}
+
+\begin{center}
+\begin{tikzpicture}[
+  node distance=0.7cm and 1.2cm,
+  unit/.style={rectangle, draw=StepTeal, rounded corners, minimum width=1.8cm,
+               minimum height=0.45cm, align=center, fill=StepDark!80, font=\tiny, text=white},
+  product/.style={rectangle, draw=StepGreen, rounded corners, minimum width=1.4cm,
+                  minimum height=0.35cm, align=center, fill=StepDark!60,
+                  font=\tiny\itshape, text=StepGreen},
+  feed/.style={rectangle, draw=StepYellow, rounded corners, minimum width=1.4cm,
+               minimum height=0.35cm, align=center, fill=StepDark!60,
+               font=\tiny, text=StepYellow},
+  stream/.style={-{Stealth[length=1.5mm]}, StepTeal, thin},
+]
+  \node[feed] (olv) {Olivine + H\textsubscript{2}O};
+  \node[unit, right=0.8cm of olv] (p1) {Pump\\100 bar};
+  \node[unit, right=0.8cm of p1] (hx1) {HX\\Preheat};
+  \node[unit, right=0.8cm of hx1, fill=StepRed!30] (serp) {Serpentinization\\250\textdegree C};
+  \node[unit, right=0.8cm of serp] (hx3) {HX\\Recovery};
+  \node[unit, right=0.8cm of hx3] (sep1) {H\textsubscript{2} Sep.};
+  \node[product, above=0.5cm of sep1] (h2) {H\textsubscript{2}};
+
+  \node[unit, below=1.0cm of sep1] (mix) {Mixer};
+  \node[feed, left=0.8cm of mix] (co2) {CO\textsubscript{2}};
+  \node[unit, left=0.8cm of co2] (p2) {Pump\\150 bar};
+  \node[unit, below=0.8cm of mix] (hx2) {HX Preheat};
+  \node[unit, right=1.0cm of hx2, fill=StepRed!30] (carb) {Carbonation\\185\textdegree C};
+  \node[unit, right=0.8cm of carb] (hx4) {HX Recovery};
+  \node[unit, right=0.8cm of hx4] (sep2) {MgCO\textsubscript{3} Sep.};
+  \node[product, above=0.5cm of sep2] (mgco3) {MgCO\textsubscript{3}};
+  \node[unit, below=0.6cm of sep2, draw=StepPurple] (lims) {LIMS};
+  \node[product, below=0.5cm of lims] (fe) {Fe\textsubscript{3}O\textsubscript{4}};
+
+  \draw[stream] (olv) -- (p1);
+  \draw[stream] (p1) -- (hx1);
+  \draw[stream] (hx1) -- (serp);
+  \draw[stream] (serp) -- (hx3);
+  \draw[stream] (hx3) -- (sep1);
+  \draw[stream] (sep1) -- (h2);
+  \draw[stream] (sep1) -- (mix);
+  \draw[stream] (co2) -- (mix);
+  \draw[stream] (p2) -- (co2);
+  \draw[stream] (mix) -- (hx2);
+  \draw[stream] (hx2) -- (carb);
+  \draw[stream] (carb) -- (hx4);
+  \draw[stream] (hx4) -- (sep2);
+  \draw[stream] (sep2) -- (mgco3);
+  \draw[stream] (sep2) -- (lims);
+  \draw[stream] (lims) -- (fe);
+\end{tikzpicture}
+\end{center}
+
+\vspace{0.3em}
+\begin{columns}[T]
+\begin{column}{0.48\textwidth}
+\textbf{Serpentinization:}\\
+\small 3\,Fe\textsubscript{2}SiO\textsubscript{4} + 2\,H\textsubscript{2}O \(\to\) 2\,Fe\textsubscript{3}O\textsubscript{4} + 3\,SiO\textsubscript{2} + 2\,H\textsubscript{2}
+\end{column}
+\begin{column}{0.48\textwidth}
+\textbf{Direct Carbonation:}\\
+\small Mg\textsubscript{2}SiO\textsubscript{4} + 2\,CO\textsubscript{2} \(\to\) 2\,MgCO\textsubscript{3} + SiO\textsubscript{2}
+\end{column}
+\end{columns}
+\end{frame}
+
+%──────────────────────────────────────────────────────────────────────
+\begin{frame}{Key Reactions and Conditions}
+\framesub{Two stoichiometric reactors in series}
+
+\begin{table}
+\centering\small
+\begin{tabular}{lcccc}
+\toprule
+\textbf{Reactor} & \textbf{T (\textdegree C)} & \textbf{P (bar)} & \textbf{Conversion} & \textbf{Key product} \\
+\midrule
+Serpentinization & 250 & 100 & 70\% Fe\textsubscript{2}SiO\textsubscript{4} & H\textsubscript{2} + Fe\textsubscript{3}O\textsubscript{4} \\
+Carbonation & 185 & 150 & 80\% Mg\textsubscript{2}SiO\textsubscript{4} & MgCO\textsubscript{3} \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\vspace{1em}
+\textbf{Why series?}
+\begin{itemize}
+\item Serpentinization first: consumes Fe\textsubscript{2}SiO\textsubscript{4}, passes Mg\textsubscript{2}SiO\textsubscript{4} through
+\item H\textsubscript{2} separated before adding CO\textsubscript{2} (prevents carbonate fouling)
+\item Remaining Mg\textsubscript{2}SiO\textsubscript{4}-rich slurry mixed with CO\textsubscript{2} for carbonation
+\end{itemize}
+\end{frame}
+
+%══════════════════════════════════════════════════════════════════════
+\section{GDP Superstructure Optimization}
+%══════════════════════════════════════════════════════════════════════
+
+%──────────────────────────────────────────────────────────────────────
+\begin{frame}{Superstructure \& Disjunctions}
+\framesub{15 units, 2 disjunctions, 4 feasible topologies}
+
+\textbf{GDP Choices:}
+\begin{enumerate}
+\item \textbf{Heat strategy}: Auxiliary heater \textit{vs.}\ heat recovery only
+\item \textbf{Magnetic separation}: LIMS for Fe\textsubscript{3}O\textsubscript{4} \textit{vs.}\ no separation
+\end{enumerate}
+
+\vspace{1em}
+\begin{table}
+\centering\small
+\begin{tabular}{clccccc}
+\toprule
+\textbf{\#} & \textbf{Config} & \textbf{Aux} & \textbf{LIMS} & \textbf{H\textsubscript{2} (mol)} & \textbf{MgCO\textsubscript{3} (mol)} & \textbf{Status} \\
+\midrule
+\rowcolor{StepGreen!15}
+2 & \textbf{Optimal} & No & Yes & 43.87 & 46.0 & \textcolor{StepGreen}{\checkmark} \\
+0 & Full & Yes & Yes & 43.87 & 46.0 & \textcolor{StepGreen}{\checkmark} \\
+3 & Minimal & No & No & 43.87 & 46.0 & \textcolor{StepGreen}{\checkmark} \\
+1 & Heat+No mag & Yes & No & 43.87 & 46.0 & \textcolor{StepGreen}{\checkmark} \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\textcolor{StepGreen}{\textbf{4/4 topologies converged successfully}}
+\end{frame}
+
+%══════════════════════════════════════════════════════════════════════
+\section{Techno-Economic Analysis}
+%══════════════════════════════════════════════════════════════════════
+
+%──────────────────────────────────────────────────────────────────────
+\begin{frame}{CAPEX Breakdown}
+\framesub{Config-2 (Optimal): Total \$9.8M}
+
+\begin{columns}[T]
+\begin{column}{0.55\textwidth}
+\begin{table}
+\centering\small
+\begin{tabular}{lcc}
+\toprule
+\textbf{Item} & \textbf{\$M} & \textbf{\%} \\
+\midrule
+Carbonation reactor & 4.38 & 44.6 \\
+Serpentinization reactor & 2.92 & 29.8 \\
+Pumps (2\(\times\)) & 1.86 & 19.0 \\
+Heat exchangers & 0.22 & 2.2 \\
+Comminution & 0.24 & 2.4 \\
+LIMS & 0.20 & 2.0 \\
+\midrule
+\textbf{Total} & \textbf{9.80} & \\
+\bottomrule
+\end{tabular}
+\end{table}
+\end{column}
+\begin{column}{0.42\textwidth}
+\textbf{Key drivers:}
+\begin{itemize}
+\item High-pressure reactors dominate (\textcolor{cost}{74\%})
+\item \SI{100}{bar}+ requires Hastelloy/Inconel construction
+\item Pump CAPEX scales with head $\times$ flow
+\end{itemize}
+\end{column}
+\end{columns}
+\end{frame}
+
+%──────────────────────────────────────────────────────────────────────
+\begin{frame}{OPEX Breakdown}
+\framesub{Config-2 OPEX: \$5.7M/yr --- labor dominates at 86\%}
+
+\begin{columns}[T]
+\begin{column}{0.55\textwidth}
+\begin{table}
+\centering\small
+\begin{tabular}{lcc}
+\toprule
+\textbf{Item} & \textbf{\$M/yr} & \textbf{\%} \\
+\midrule
+\textcolor{cost}{Labor (10 ops)} & \textcolor{cost}{4.906} & \textcolor{cost}{86.1} \\
+Pumping electricity & 0.412 & 7.2 \\
+Maintenance & 0.294 & 5.2 \\
+Net heating & 0.047 & 0.8 \\
+Comminution & 0.033 & 0.6 \\
+CO\textsubscript{2} purchase & 0.003 & 0.1 \\
+\midrule
+\textbf{Total} & \textbf{5.695} & \\
+\bottomrule
+\end{tabular}
+\end{table}
+\end{column}
+\begin{column}{0.42\textwidth}
+\textbf{Insight:}\\[6pt]
+\textcolor{StepRed}{\textbf{Labor = 86\% of OPEX}}\\[6pt]
+This is fundamentally a \textbf{scale problem}:\\
+10 operators are needed regardless of whether throughput is 100 or \SI{1000}{t/d}
+\end{column}
+\end{columns}
+\end{frame}
+
+%──────────────────────────────────────────────────────────────────────
+\begin{frame}{Revenue vs.\ Cost}
+\framesub{Net: $-$\$6.6M/yr ($-$\$200/t ore) at current scale and prices}
+
+\begin{table}
+\centering\small
+\begin{tabular}{lccc}
+\toprule
+\textbf{Product} & \textbf{Production} & \textbf{Price} & \textbf{Revenue (\$/yr)} \\
+\midrule
+H\textsubscript{2} gas & 4.4 t/yr & \$4,000/t & \textcolor{revenue}{\$17,500} \\
+CO\textsubscript{2} credits & 99 t/yr & \$60/t & \textcolor{revenue}{\$5,940} \\
+Fe\textsubscript{3}O\textsubscript{4} & 501 t/yr & \$120/t & \textcolor{revenue}{\$60,120} \\
+SiO\textsubscript{2} agg. & 2,636 t/yr & \$10/t & \textcolor{revenue}{\$2,636} \\
+\midrule
+\textbf{Total Revenue} & & & \textcolor{revenue}{\textbf{\$86,196}} \\
+\midrule
+\textbf{EAC} & & & \textcolor{cost}{\textbf{\$6,693,000}} \\
+\midrule
+\textbf{Net Value} & & & \textcolor{cost}{\textbf{$-$\$6,607,000}} \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\vspace{0.5em}
+\centering\textcolor{StepRed}{\textbf{Revenue covers only 1.3\% of annualized costs}}
+\end{frame}
+
+%══════════════════════════════════════════════════════════════════════
+\section{Pathways to Viability}
+%══════════════════════════════════════════════════════════════════════
+
+%──────────────────────────────────────────────────────────────────────
+\begin{frame}{Scale Sensitivity}
+\framesub{Labor dilution is the primary lever}
+
+\begin{table}
+\centering\small
+\begin{tabular}{ccccc}
+\toprule
+\textbf{Scale (t/d)} & \textbf{CAPEX (\$M)} & \textbf{EAC (\$M/yr)} & \textbf{Revenue (\$M/yr)} & \textbf{Net (\$/t)} \\
+\midrule
+100 & 9.8 & 6.69 & 0.086 & \textcolor{cost}{$-$200} \\
+500 & 25 & 8.72 & 0.430 & \textcolor{cost}{$-$50} \\
+1,000 & 40 & 11.3 & 0.861 & \textcolor{cost}{$-$32} \\
+\rowcolor{StepYellow!15}
+5,000 & 120 & 23.7 & 4.31 & \textcolor{cost}{$-$12} \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\vspace{0.5em}
+\textbf{Three pathways:}
+\begin{enumerate}
+\item Scale-up to \SI{5000}{t/d}+ --- labor drops from \$149/t to \$3/t
+\item Higher CO\textsubscript{2} credits (\$200+/t) --- adds \$0.6/t per \$100/t increase
+\item Co-location with existing mineral processing --- eliminates standalone labor
+\end{enumerate}
+\end{frame}
+
+%══════════════════════════════════════════════════════════════════════
+\section{Conclusions}
+%══════════════════════════════════════════════════════════════════════
+
+%──────────────────────────────────────────────────────────────────────
+\begin{frame}{Key Findings}
+
+\begin{enumerate}
+\item Olivine valorization via serpentinization + carbonation is \textbf{technically feasible} --- 4/4 GDP topologies converge
+\item Produces 0.13\,kg H\textsubscript{2}/t, 3.0\,kg CO\textsubscript{2} sequestered/t, 15.2\,kg Fe\textsubscript{3}O\textsubscript{4}/t ore
+\item \textcolor{cost}{\textbf{Uneconomic at \SI{100}{t/d}}} ($-$\$200/t) --- labor dominates at 86\% of EAC
+\item \textbf{Optimal config}: heat recovery only + LIMS (\$9.8M CAPEX, \$5.7M/yr OPEX)
+\item Scale-up to \SI{5000}{t/d} reduces net cost to $-$\$12/t
+\end{enumerate}
+
+\vspace{1em}
+\textbf{Recommended next steps:}
+\begin{itemize}
+\item Pilot-scale carbonation kinetics at \SI{185}{\celsius} / \SI{150}{bar}
+\item Co-location feasibility study with existing mine operations
+\item Enhanced weathering assessment (ambient T/P) as alternative
+\end{itemize}
+\end{frame}
+
+%──────────────────────────────────────────────────────────────────────
+\closingSlide
+
+\end{document}

@@ -1,0 +1,24 @@
+\contentsline {section}{\numberline {1}Introduction and Opportunity}{3}{section.1}%
+\contentsline {section}{\numberline {2}Raw Material Composition}{3}{section.2}%
+\contentsline {subsection}{\numberline {2.1}Mineralogy}{3}{subsection.2.1}%
+\contentsline {subsection}{\numberline {2.2}Oxide Basis}{3}{subsection.2.2}%
+\contentsline {section}{\numberline {3}Process Description}{3}{section.3}%
+\contentsline {subsection}{\numberline {3.1}Process Flow Diagram}{4}{subsection.3.1}%
+\contentsline {subsection}{\numberline {3.2}Key Reactions}{4}{subsection.3.2}%
+\contentsline {paragraph}{Serpentinization (H\textsubscript {2} production):}{4}{section*.5}%
+\contentsline {paragraph}{Direct carbonation of forsterite:}{5}{section*.6}%
+\contentsline {section}{\numberline {4}Modeling Approach}{5}{section.4}%
+\contentsline {section}{\numberline {5}GDP Superstructure Analysis}{5}{section.5}%
+\contentsline {subsection}{\numberline {5.1}Superstructure Definition}{5}{subsection.5.1}%
+\contentsline {subsection}{\numberline {5.2}Topology Ranking}{5}{subsection.5.2}%
+\contentsline {section}{\numberline {6}Cost Model Assumptions}{6}{section.6}%
+\contentsline {section}{\numberline {7}Results}{7}{section.7}%
+\contentsline {subsection}{\numberline {7.1}Itemized Economics (Config-2: Optimal)}{7}{subsection.7.1}%
+\contentsline {subsection}{\numberline {7.2}Net Economics}{7}{subsection.7.2}%
+\contentsline {subsection}{\numberline {7.3}Cost Driver Analysis}{8}{subsection.7.3}%
+\contentsline {section}{\numberline {8}Discussion}{8}{section.8}%
+\contentsline {subsection}{\numberline {8.1}Economic Barriers}{8}{subsection.8.1}%
+\contentsline {subsection}{\numberline {8.2}Pathways to Viability}{8}{subsection.8.2}%
+\contentsline {subsection}{\numberline {8.3}Comparison with CO\textsubscript {2} Mineralization Literature}{8}{subsection.8.3}%
+\contentsline {subsection}{\numberline {8.4}Key Risks}{9}{subsection.8.4}%
+\contentsline {section}{\numberline {9}Conclusions}{9}{section.9}%

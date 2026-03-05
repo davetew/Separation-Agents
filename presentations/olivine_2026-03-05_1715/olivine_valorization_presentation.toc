@@ -1,0 +1,6 @@
+\beamer@sectionintoc {1}{Resource Characterization}{3}{0}{1}
+\beamer@sectionintoc {2}{Process Design}{5}{0}{2}
+\beamer@sectionintoc {3}{GDP Superstructure Optimization}{7}{0}{3}
+\beamer@sectionintoc {4}{Techno-Economic Analysis}{8}{0}{4}
+\beamer@sectionintoc {5}{Pathways to Viability}{11}{0}{5}
+\beamer@sectionintoc {6}{Conclusions}{12}{0}{6}

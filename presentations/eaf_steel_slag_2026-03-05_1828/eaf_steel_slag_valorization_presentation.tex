@@ -1,0 +1,407 @@
+\documentclass[aspectratio=169]{beamer}
+
+% --- Step Function Branding ---
+\usepackage{sf-branding}
+
+% --- Additional packages ---
+\usepackage{appendixnumberbeamer}
+\usepackage{amsmath,amssymb}
+\usepackage{siunitx}
+\sisetup{group-separator={,}, group-minimum-digits=4}
+\usepackage{graphicx}
+\usepackage{booktabs}
+\usepackage{tikz}
+\usetikzlibrary{arrows.meta,positioning,shapes.geometric,calc}
+
+% Project-specific colors (data viz only)
+\definecolor{revenue}{HTML}{22D3EE}
+\definecolor{cost}{HTML}{EF4444}
+\definecolor{neutral}{HTML}{94A3B8}
+
+\title{Techno-Economic Assessment of\\[4pt] \textbf{EAF Steel Slag} Valorization}
+\subtitle{Iron Recovery $\cdot$ CO$_2$ Mineralization $\cdot$ H$_2$ Production}
+\author{Step Function}
+\date{\today}
+
+\begin{document}
+
+% ══════════════════════════════════════════════════════════════
+\begin{frame}
+\titlepage
+\end{frame}
+
+% ══════════════════════════════════════════════════════════════
+\begin{frame}{Outline}
+\tableofcontents
+\end{frame}
+
+% ══════════════════════════════════════════════════════════════
+\section{Background \& Opportunity}
+
+\begin{frame}{Electric Arc Furnace Steel Slag}
+\begin{columns}[T]
+\begin{column}{0.55\textwidth}
+\begin{itemize}
+  \item EAF steelmaking generates 150--200 kg slag per tonne steel
+  \item Global EAF production: $>$500 Mt/yr
+  \item Higher Fe and Cr content than BOF slag
+  \item Currently landfilled or low-value aggregate
+\end{itemize}
+\vspace{8pt}
+\textbf{Opportunity:} Multi-product valorization targeting:
+\begin{enumerate}
+  \item Iron + Cr + Mn magnetic recovery
+  \item Green H$_2$ via serpentinization
+  \item CO$_2$ credits via carbonation
+\end{enumerate}
+\end{column}
+\begin{column}{0.42\textwidth}
+\begin{tabular}{@{}lr@{}}
+\toprule
+\textbf{Oxide} & \textbf{wt\%} \\
+\midrule
+CaO     & 30 \\
+FeO     & 25 \\
+Fe$_2$O$_3$ & 8 \\
+SiO$_2$ & 17 \\
+MgO     & 8 \\
+Al$_2$O$_3$ & 6 \\
+MnO     & 4 \\
+Cr$_2$O$_3$ & 2 \\
+\bottomrule
+\end{tabular}
+\end{column}
+\end{columns}
+\end{frame}
+
+\begin{frame}{Study Scope}
+\begin{itemize}
+  \item \textbf{Throughput:} \num{100000} t/yr EAF slag (303 t/d, 330 operating days)
+  \item \textbf{Objective:} Maximize Net Present Value
+  \item \textbf{Constraint:} Include only value streams with positive economics
+  \item \textbf{Tools:} Reaktoro GEM, IDAES-PSE, JAX TEA, BoTorch GDP
+\end{itemize}
+\end{frame}
+
+% ══════════════════════════════════════════════════════════════
+\section{Process Design}
+
+\begin{frame}{Process Flow Diagram}
+\centering
+\begin{tikzpicture}[
+  node distance=0.9cm and 1.4cm,
+  unit/.style={rectangle, draw=StepGrey, thick, rounded corners,
+               minimum width=2.0cm, minimum height=0.55cm,
+               align=center, fill=StepElectric!15, text=white, font=\tiny},
+  feed/.style={rectangle, draw=StepGrey, thick, rounded corners,
+               minimum width=1.6cm, minimum height=0.45cm,
+               align=center, fill=StepOrange!15, text=white, font=\tiny\itshape},
+  prod/.style={rectangle, draw=StepGrey, thick, rounded corners,
+               minimum width=1.6cm, minimum height=0.45cm,
+               align=center, fill=StepGreen!15, text=white, font=\tiny\itshape},
+  stream/.style={-{Stealth[length=2mm]}, thick, draw=StepGrey},
+]
+
+% Row 1
+\node[feed] (slag) {EAF Slag\\+ H$_2$O};
+\node[unit, right=of slag] (pump1) {P-101\\Pump};
+\node[unit, right=of pump1] (lims) {LIMS\\Mag Sep};
+\node[prod, above=0.5cm of lims] (feconc) {Fe$_3$O$_4$+Cr+Mn};
+\node[unit, right=of lims] (hx1) {E-101\\Preheat};
+\node[unit, right=of hx1] (serp) {R-101 Serp\\250\textdegree C, 300~bar};
+
+% Row 2
+\node[unit, below=0.8cm of serp] (hx2) {E-102\\Recovery};
+\node[unit, left=of hx2] (sep1) {S-101\\H$_2$ Sep};
+\node[prod, below=0.5cm of sep1] (h2) {H$_2$ Gas};
+
+% Row 3
+\node[feed, below=0.5cm of hx2] (co2) {CO$_2$ Feed};
+\node[unit, right=of co2] (mixer) {M-201\\Mixer};
+\node[unit, right=of mixer] (hx3) {E-201\\Preheat};
+\node[unit, below=0.8cm of hx3] (carb) {R-201 Carb\\185\textdegree C, 150~bar};
+\node[unit, left=of carb] (hx4) {E-202\\Recovery};
+\node[unit, left=of hx4] (sep2) {S-201\\Solid Sep};
+\node[prod, below=0.5cm of sep2] (caco3) {CaCO$_3$/MgCO$_3$};
+
+% Streams
+\draw[stream] (slag) -- (pump1);
+\draw[stream] (pump1) -- (lims);
+\draw[stream] (lims) -- (feconc);
+\draw[stream] (lims) -- (hx1);
+\draw[stream] (hx1) -- (serp);
+\draw[stream] (serp) -- (hx2);
+\draw[stream] (hx2) -- (sep1);
+\draw[stream] (sep1) -- (h2);
+\draw[stream] (sep1.west) -- ++(-0.3,0) |- (mixer.north);
+\draw[stream] (co2) -- (mixer);
+\draw[stream] (mixer) -- (hx3);
+\draw[stream] (hx3) -- (carb);
+\draw[stream] (carb) -- (hx4);
+\draw[stream] (hx4) -- (sep2);
+\draw[stream] (sep2) -- (caco3);
+\end{tikzpicture}
+\end{frame}
+
+\begin{frame}{Key Reactions}
+\textbf{Serpentinization} (H$_2$ production):
+\begin{equation*}
+3\,\text{Fe}_2\text{SiO}_4 + 2\,\text{H}_2\text{O}
+\longrightarrow 2\,\text{Fe}_3\text{O}_4 + 3\,\text{SiO}_2 + 2\,\text{H}_2
+\end{equation*}
+\begin{itemize}
+  \item Equilibrium conversion: $\sim$49\% at 200\textdegree C, 300 bar
+  \item Modeled by Gibbs energy minimization (Reaktoro)
+\end{itemize}
+
+\vspace{10pt}
+\textbf{Carbonation} (CO$_2$ mineralization):
+\begin{equation*}
+\text{CaO} + \text{CO}_2 \rightarrow \text{CaCO}_3
+\qquad\qquad
+\text{MgO} + \text{CO}_2 \rightarrow \text{MgCO}_3
+\end{equation*}
+\begin{itemize}
+  \item Equilibrium conversion: $\sim$100\% at 185\textdegree C, 150 bar
+  \item 323 kg CO$_2$ sequestered per tonne slag
+\end{itemize}
+\end{frame}
+
+\begin{frame}{Modeling Methodology}
+\centering
+\begin{tabular}{@{}lll@{}}
+\toprule
+\textbf{Tier} & \textbf{Tool} & \textbf{Purpose} \\
+\midrule
+Thermodynamic & Reaktoro (GEM) & Equilibrium reactor conversion \\
+Process & IDAES-PSE & Sequential-modular flowsheet \\
+Economic & JAX TEA & Differentiable cost model \\
+Optimization & BoTorch + GDP & Bayesian topology optimization \\
+\bottomrule
+\end{tabular}
+
+\vspace{12pt}
+\begin{itemize}
+  \item 10 continuous design variables optimized per topology
+  \item 4 topologies enumerated (2 disjunctions $\times$ 2 choices)
+\end{itemize}
+\end{frame}
+
+% ══════════════════════════════════════════════════════════════
+\section{GDP Superstructure Analysis}
+
+\begin{frame}{GDP Disjunctions}
+\begin{columns}[T]
+\begin{column}{0.48\textwidth}
+\textbf{Disjunction 1: LIMS Position}
+\begin{itemize}
+  \item \textcolor{StepGreen}{Before} serpentinization\\
+        {\small(recover pre-existing Fe$_3$O$_4$)}
+  \item \textcolor{StepGreen}{After} serpentinization\\
+        {\small(recover serpentinization-formed Fe$_3$O$_4$)}
+\end{itemize}
+\end{column}
+\begin{column}{0.48\textwidth}
+\textbf{Disjunction 2: Heat Strategy}
+\begin{itemize}
+  \item \textcolor{StepGreen}{Full recovery}\\
+        {\small(counter-flow HX only)}
+  \item \textcolor{StepGreen}{Supplemental heater}\\
+        {\small(HX + aux electric heater)}
+\end{itemize}
+\end{column}
+\end{columns}
+
+\vspace{12pt}
+\centering
+$\Rightarrow$ \textbf{4 feasible topologies} evaluated with BoTorch
+\end{frame}
+
+\begin{frame}{Topology Ranking}
+\centering
+\begin{tabular}{@{}clccr@{}}
+\toprule
+\textbf{Rank} & \textbf{LIMS} & \textbf{Aux Heat} & \textbf{OPEX/batch} & \textbf{Status} \\
+\midrule
+\textbf{1} & \textbf{No} & \textbf{No} & \textbf{\$38.24} & \textcolor{StepGreen}{Best} \\
+2 & No & Yes & \$38.36 & OK \\
+3 & Yes & No & \$38.24 & OK \\
+4 & Yes & Yes & \$38.64 & OK \\
+\bottomrule
+\end{tabular}
+
+\vspace{10pt}
+{\small All topologies within \$0.40/batch --- marginal differences.\\
+LIMS adds minimal OPEX but enables metal recovery.}
+\end{frame}
+
+% ══════════════════════════════════════════════════════════════
+\section{Results \& Economics}
+
+\begin{frame}{Material Balance}
+\centering
+\begin{tabular}{@{}lrrr@{}}
+\toprule
+\textbf{Product} & \textbf{kg/t slag} & \textbf{t/yr} & \textbf{Source} \\
+\midrule
+CO$_2$ sequestered      & 322.8 & \num{32280}  & Carbonation \\
+Fe$_3$O$_4$ concentrate & 208.9 & \num{20891}  & Serp + native \\
+MnO (in Fe conc)        & 34.0  & \num{3400}   & LIMS \\
+Cr$_2$O$_3$ (in Fe conc) & 17.0 & \num{1700}   & LIMS \\
+H$_2$ gas               & 1.15  & 115          & Serpentinization \\
+Aggregate               & 400   & \num{40000}  & Residual \\
+\bottomrule
+\end{tabular}
+\end{frame}
+
+\begin{frame}{Revenue Breakdown}
+\centering
+\begin{tabular}{@{}lrr@{}}
+\toprule
+\textbf{Stream} & \textbf{Revenue (\$/yr)} & \textbf{Share} \\
+\midrule
+\textcolor{StepTeal}{Cr$_2$O$_3$ (in Fe conc)} & \textbf{\$\num{3400000}} & 36\% \\
+\textcolor{StepElectric}{Fe$_3$O$_4$ concentrate} & \$\num{2506898} & 27\% \\
+\textcolor{StepGreen}{CO$_2$ credits} & \$\num{1936778} & 21\% \\
+MnO (in Fe conc) & \$\num{680000} & 7\% \\
+H$_2$ gas & \$\num{458288} & 5\% \\
+Aggregate & \$\num{400000} & 4\% \\
+\midrule
+\textbf{Total} & \textbf{\$\num{9381964}} & 100\% \\
+\bottomrule
+\end{tabular}
+
+\vspace{8pt}
+{\small \textbf{All six streams contribute positively.} Cr$_2$O$_3$ is the dominant value despite being only 2\,wt\% of slag.}
+\end{frame}
+
+\begin{frame}{Cost Structure}
+\begin{columns}[T]
+\begin{column}{0.48\textwidth}
+\textbf{CAPEX: \$42.7M}
+\begin{tabular}{@{}lr@{}}
+\toprule
+\textbf{Item} & \textbf{\$M} \\
+\midrule
+Reactors      & 14.0 \\
+Handling      & 7.0 \\
+Contingency   & 7.2 \\
+Utilities     & 4.0 \\
+HX / Pumps    & 5.5 \\
+Separation    & 5.0 \\
+\bottomrule
+\end{tabular}
+\end{column}
+\begin{column}{0.48\textwidth}
+\textbf{OPEX: \$3.7M/yr}
+\begin{tabular}{@{}lr@{}}
+\toprule
+\textbf{Item} & \textbf{\$M/yr} \\
+\midrule
+Maintenance   & 1.28 \\
+CO$_2$ capture & 0.97 \\
+Labor         & 0.80 \\
+Electricity   & 0.40 \\
+Water + waste & 0.25 \\
+\bottomrule
+\end{tabular}
+\end{column}
+\end{columns}
+\end{frame}
+
+% ══════════════════ BIG NUMBER SLIDE ══════════════════
+\begin{frame}{Net Value}
+\centering
+\vspace{1.5cm}
+{\Huge\textbf{\textcolor{StepGreen}{\$13.33/t}}}\\[12pt]
+{\large Net value per tonne of EAF steel slag}\\[10pt]
+{\normalsize
+\textcolor{StepGreen}{Revenue: \$93.82/t} \quad
+\textcolor{StepRed}{Cost: \$80.48/t}}\\[16pt]
+{\small
+Revenue: \$9.38M/yr \quad|\quad EAC: \$8.05M/yr \quad|\quad Net: \$1.33M/yr}
+\end{frame}
+
+\begin{frame}{NPV and Payback}
+\centering
+\begin{tabular}{@{}lr@{}}
+\toprule
+\textbf{Metric} & \textbf{Value} \\
+\midrule
+Total Revenue           & \$9.38M/yr \\
+Total OPEX              & \$3.70M/yr \\
+Operating Cash Flow     & \$5.68M/yr \\
+CAPEX                   & \$42.7M \\
+Simple Payback          & 7.5 years \\
+NPV (8\%, 20 yr)        & --\$29.6M \\
+NPV (3\%, 20 yr)        & +\$\num{3.5}M \\
+\bottomrule
+\end{tabular}
+
+\vspace{10pt}
+{\small Project is \textbf{cash-flow positive} (operating margin \$5.7M/yr)\\
+but CAPEX-intensive. NPV turns positive at discount rates $<$4\%.}
+\end{frame}
+
+% ══════════════════════════════════════════════════════════════
+\section{Sensitivity \& Optimization}
+
+\begin{frame}{BoTorch Optimized Parameters}
+\centering
+\begin{tabular}{@{}lrrr@{}}
+\toprule
+\textbf{Variable} & \textbf{Optimal} & \textbf{Lower} & \textbf{Upper} \\
+\midrule
+Serp T (\textdegree C) & 200 & 200 & 300 \\
+Serp P (bar)           & 300 & 50 & 300 \\
+Carb T (\textdegree C) & 200 & 100 & 200 \\
+Carb P (bar)           & 150 & 10 & 150 \\
+All HX areas           & Lower bound & --- & --- \\
+All pump heads         & Lower bound & --- & --- \\
+\bottomrule
+\end{tabular}
+
+\vspace{8pt}
+{\small BoTorch drives energy-related variables to bounds.\\
+Serp: high pressure maximizes conversion. Carb: high T+P maximizes CO$_2$ fixation.}
+\end{frame}
+
+\begin{frame}{Key Sensitivities}
+\begin{itemize}
+  \item \textbf{Cr$_2$O$_3$ price $\pm$30\%}: $\Delta$Revenue $= \pm$\$1.0M/yr
+  \item \textbf{CO$_2$ credits to \$80/t}: +\$0.65M/yr (EU ETS pricing)
+  \item \textbf{CAPEX $-$20\%}: NPV improves by \$8.5M
+  \item \textbf{Discount rate 5\%}: NPV improves by $\sim$\$12M
+  \item \textbf{H$_2$ price to \$6/kg}: +\$0.23M/yr (modest impact)
+\end{itemize}
+
+\vspace{8pt}
+$\Rightarrow$ \textbf{Cr and CO$_2$ prices are the primary economic levers}
+\end{frame}
+
+% ══════════════════════════════════════════════════════════════
+\section{Conclusions}
+
+\begin{frame}{Key Findings}
+\begin{enumerate}
+  \item EAF slag valorization generates \textbf{\$9.4M/yr revenue} from 6 streams
+  \item \textbf{Cr$_2$O$_3$ recovery} is the dominant value (\$3.4M/yr, 36\%)\\
+        {\small despite being only 2\,wt\% of slag}
+  \item CO$_2$ mineralization sequesters \textbf{32,280 t CO$_2$/yr}
+  \item Net value: \textcolor{StepGreen}{\textbf{\$13.33/t slag}} (all 6 streams are positive)
+  \item Project is \textbf{cash-flow positive} but CAPEX-intensive (NPV negative at 8\%)
+\end{enumerate}
+
+\vspace{10pt}
+\textbf{Next Steps:}
+\begin{itemize}
+  \item Pilot-scale validation of serpentinization kinetics
+  \item Detailed CAPEX estimation (AACE Class~3)
+  \item Evaluate EU ETS pathway for CO$_2$ credits
+\end{itemize}
+\end{frame}
+
+% ══════════════════════════════════════════════════════════════
+\closingSlide
+
+\end{document}

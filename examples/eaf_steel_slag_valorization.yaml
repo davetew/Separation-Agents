@@ -1,0 +1,104 @@
+# EAF Steel Slag Valorization – Feed Characterization
+# =====================================================
+# Electric Arc Furnace (EAF) Steel Slag
+# Source: Electric steelmaking (scrap recycling)
+# Throughput: 100,000 t/yr (~303 t/d at 330 operating days)
+#
+# Typical EAF slag composition (wt%):
+#   CaO: 25-35%  (lower than BOF due to less flux addition)
+#   FeO: 20-30%  (higher than BOF; significant Fe²⁺ content)
+#   Fe₂O₃: 5-10%
+#   SiO₂: 15-20%
+#   MgO:  5-10%
+#   Al₂O₃: 4-8%
+#   MnO:  3-6%
+#   Cr₂O₃: 1-3%  (from stainless steel scrap)
+#   TiO₂:  0.5-1%
+#
+# Value Streams Identified:
+#   1. Fe₃O₄ recovery via magnetic separation (iron concentrate)
+#   2. H₂ production via serpentinization of fayalite (Fe₂SiO₄)
+#   3. CO₂ sequestration via mineral carbonation (CaO + MgO + CO₂ → CaCO₃/MgCO₃)
+#   4. Construction aggregate (residual silicates)
+#
+# Commodity Prices:
+#   Fe₃O₄ concentrate: $120/t
+#   Green H₂: $4/kg  (DOE target)
+#   CO₂ credit: $60/t (voluntary carbon market)
+#   Construction aggregate: $10/t
+
+name: eaf_steel_slag_valorization
+
+streams:
+  # ── Primary feed: EAF steel slag + water slurry ─────────────
+  # Basis: 1000 kg slag dissolved/suspended per batch in water
+  # Converted from wt% oxide to mineral species for Reaktoro
+  #
+  # EAF slag assumed composition (1000 kg basis):
+  #   CaO:   300 kg → 300/56.08 = 5.35 mol CaO
+  #   FeO:   250 kg → 250/71.85 = 3.48 mol as Fe₂SiO₄ (fayalite)
+  #   Fe₂O₃:  80 kg → 80/159.69 = 0.50 mol (already oxidized → mag sep target)
+  #   SiO₂:  170 kg → 170/60.08 = 2.83 mol SiO₂
+  #   MgO:    80 kg → 80/40.30 = 1.99 mol MgO
+  #   Al₂O₃:  60 kg → inert (gangue)
+  #   MnO:    40 kg → reports to iron concentrate
+  #   Cr₂O₃:  20 kg → reports to iron concentrate
+  #
+  # For the geo-reactor model, lump FeO + SiO₂ → fayalite (Fe₂SiO₄)
+  #   3.48 mol FeO → 1.74 mol Fe₂SiO₄ (consuming 1.74 mol SiO₂)
+  #   remaining SiO₂: 2.83 - 1.74 = 1.09 mol → gangue
+  - name: slag_water_feed
+    phase: liquid
+    temperature_K: 298.15
+    pressure_Pa: 101325
+    composition_wt:
+      H2O: 800.0
+      Fe2SiO4: 1.74     # mol - fayalite from FeO+SiO2
+      CaO: 5.35          # mol
+      MgO: 1.99          # mol - magnesia
+      SiO2: 1.09          # mol - free silica (gangue)
+      Fe3O4: 0.33         # mol - pre-existing magnetite (from Fe₂O₃)
+
+  # ── CO₂ feed for mineral carbonation ────────────────────────
+  # Stoichiometric CO₂ for CaO + MgO carbonation
+  # Required: (5.35 + 1.99) × 44 g/mol = 323 kg CO₂ → ~7.34 kmol
+  # Use 10% excess
+  - name: co2_feed
+    phase: gas
+    temperature_K: 298.15
+    pressure_Pa: 101325
+    composition_wt:
+      CO2: 8.07           # kmol (with 10% excess)
+
+  # ── Water makeup for serpentinization ────────────────────────
+  - name: water_feed
+    phase: liquid
+    temperature_K: 298.15
+    pressure_Pa: 101325
+    composition_wt:
+      H2O: 500.0
+
+# ── Value Stream Summary ─────────────────────────────────────
+# Stream 1: Iron Concentrate (Fe₃O₄)
+#   Source: LIMS magnetic separation of slag
+#   Fe₃O₄ grade: ~85% recovery at 0.3T
+#   Revenue: 0.33 mol Fe₃O₄ × 231.53 g/mol = 76.4 g → $120/t = $0.009/batch
+#   At scale: (100,000 t slag) × 8% Fe content → 8,000 t Fe₃O₄ → $960,000/yr
+#
+# Stream 2: Hydrogen (H₂)
+#   Source: Serpentinization of fayalite
+#   3 Fe₂SiO₄ + 2 H₂O → 2 Fe₃O₄ + 3 SiO₂ + 2 H₂
+#   Equilibrium conversion depends on T, P (thermodynamically driven)
+#   Revenue at 100% conv: 1.74 mol Fe₂SiO₄ → 1.16 mol H₂ = 2.34 g = $0.009/batch
+#   At scale: very low volume; may not be economically viable alone
+#
+# Stream 3: CO₂ Sequestration Credits
+#   Source: Mineral carbonation of CaO and MgO
+#   CaO + CO₂ → CaCO₃; MgO + CO₂ → MgCO₃
+#   Max CO₂ captured: (5.35 + 1.99) × 44 g/mol = 323 g/batch
+#   At scale: 100,000 t slag × 38% (CaO+MgO) → 26,400 t CO₂ sequestered
+#   Revenue: 26,400 t × $60/t = $1,584,000/yr
+#
+# Stream 4: Construction Aggregate
+#   Residual solids (silicates, carbonates, alumina)
+#   Revenue: minimal ($10/t) but reduces disposal costs

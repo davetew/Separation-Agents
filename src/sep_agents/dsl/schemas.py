@@ -45,9 +45,12 @@ UNIT_PARAM_SPEC = {
                 "tank_volume_m3", "agitation_power_kW"],
     },
     "equilibrium_reactor": {
-        "req": ["residence_time_s", "T_C"],
-        "opt": ["tank_volume_m3", "agitation_power_kW", "p_bar",
-                "reagent_dosage_gpl", "reagent_name"],
+        "req": [],
+        "opt": ["residence_time_s", "T_C", "T_K", "p_bar", "P_Pa",
+                "tank_volume_m3", "agitation_power_kW",
+                "reagent_dosage_gpl", "reagent_name",
+                "equilibrium_phases", "gas_phases",
+                "aqueous_elements", "database"],
     },
     "separator": {
         "req": [],
@@ -115,6 +118,8 @@ class UnitOp(BaseModel):
             if p not in self.params:
                 raise ValueError(f"Missing required parameter '{p}' for unit type '{unit_type}'")
         for p in self.params:
+            if p.startswith("_"):
+                continue  # skip internal solver state (e.g. _reaction_kpis)
             if p not in req_params and p not in opt_params:
                 raise ValueError(f"Unknown parameter '{p}' for unit type '{unit_type}'")
         return self

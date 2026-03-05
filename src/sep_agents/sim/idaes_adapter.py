@@ -64,6 +64,47 @@ PUMP_TYPES = {"pump"}
 
 
 # ---------------------------------------------------------------------------
+# Species name mapping: DSL formula names ↔ Reaktoro database names
+# ---------------------------------------------------------------------------
+# Reaktoro uses geological/mineralogical names for solid phases and suffixed
+# names for aqueous/gaseous species.  The DSL uses chemical formulas for
+# portability.  These mappings bridge the two namespaces.
+
+FORMULA_TO_REAKTORO: Dict[str, str] = {
+    # Minerals (solids)
+    "Mg2SiO4":  "Forsterite",
+    "Fe2SiO4":  "Fayalite",
+    "Fe3O4":    "Magnetite",
+    "Fe2O3":    "Hematite",
+    "MgCO3":    "Magnesite",
+    "CaCO3":    "Calcite",
+    "FeCO3":    "Siderite",
+    "SiO2":     "Quartz",
+    "CaO":      "Lime",
+    "MgO":      "Periclase",
+    "MgO2H2":   "Brucite",
+    "CaMgC2O6": "Dolomite",
+    # Aqueous species (passthrough — may already be in Reaktoro form)
+    "H2O":      "H2O(aq)",
+    # Gaseous species
+    "H2":       "H2(g)",
+    "CO2":      "CO2(g)",
+    "O2":       "O2(g)",
+    "H2S":      "H2S(g)",
+    "CH4":      "CH4(g)",
+}
+
+# Reverse mapping for converting Reaktoro output back to DSL names
+REAKTORO_TO_FORMULA: Dict[str, str] = {v: k for k, v in FORMULA_TO_REAKTORO.items()}
+
+# Default mineral phases for a geo-reactor equilibrium system
+DEFAULT_GEO_MINERAL_PHASES = [
+    "Forsterite", "Fayalite", "Magnetite", "Magnesite", "Quartz",
+    "Hematite", "Brucite", "Calcite", "Siderite", "Dolomite",
+]
+
+
+# ---------------------------------------------------------------------------
 # Lightweight stream-state container
 # ---------------------------------------------------------------------------
 class StreamState:
@@ -473,6 +514,12 @@ class IDAESFlowsheetBuilder:
         """Run Reaktoro equilibrium on inlet mixture → outlet at equilibrium.
 
         Falls back to pass-through if Reaktoro is unavailable.
+
+        When ``unit.params`` contains ``"equilibrium_phases"``, a dedicated
+        geo-mineral ChemicalSystem is built and species names are translated
+        between DSL formula names and Reaktoro mineral names.  Conversion
+        KPIs are computed from inlet-vs-outlet deltas and stored in
+        ``unit.params["_reaction_kpis"]``.
         """
         inlet = self._merge_inlets(inlets)
 
@@ -496,20 +543,41 @@ class IDAESFlowsheetBuilder:
         if "p_bar" in unit.params:
             P_Pa = float(unit.params["p_bar"]) * 1e5
 
-        system = self._get_rkt_system()
+        # -----------------------------------------------------------------
+        # Determine if this is a geo-mineral equilibrium reactor
+        # -----------------------------------------------------------------
+        is_geo = "equilibrium_phases" in unit.params
+
+        system = self._get_rkt_system(unit.params if is_geo else None)
         state = rkt.ChemicalState(system)
         state.temperature(T_K, "kelvin")
         state.pressure(P_Pa, "pascal")
 
-        # Map species amounts into Reaktoro state
         system_species = {sp.name() for sp in system.species()}
+
+        # Record inlet amounts (in DSL namespace) for KPI computation
+        inlet_amounts_dsl: Dict[str, float] = {}
+
+        # Map species amounts into Reaktoro state
         for sp_name, amount in inlet.species_amounts.items():
             if amount <= 0:
                 continue
-            if sp_name in system_species:
-                state.setSpeciesAmount(sp_name, amount, "mol")
+
+            if is_geo:
+                # Translate DSL formula name → Reaktoro name
+                rkt_name = FORMULA_TO_REAKTORO.get(sp_name, sp_name)
             else:
-                _log.debug("Species '%s' not in Reaktoro system, skipped", sp_name)
+                rkt_name = sp_name
+
+            inlet_amounts_dsl[sp_name] = amount
+
+            if rkt_name in system_species:
+                state.setSpeciesAmount(rkt_name, amount, "mol")
+            else:
+                _log.debug(
+                    "Species '%s' (→ '%s') not in Reaktoro system, skipped",
+                    sp_name, rkt_name,
+                )
 
         # Handle reagent dosage injection
         if "reagent_dosage_gpl" in unit.params and "reagent_name" in unit.params:
@@ -550,11 +618,18 @@ class IDAESFlowsheetBuilder:
             flow_mol=inlet.flow_mol,
         )
 
-        # Extract species amounts
+        # Extract species amounts (translate back to DSL names if geo)
+        outlet_amounts_dsl: Dict[str, float] = {}
         for i, sp in enumerate(system.species()):
             amt = float(state.speciesAmount(i))
             if amt > 1e-15:
-                outlet.species_amounts[sp.name()] = amt
+                rkt_name = sp.name()
+                if is_geo:
+                    dsl_name = REAKTORO_TO_FORMULA.get(rkt_name, rkt_name)
+                else:
+                    dsl_name = rkt_name
+                outlet.species_amounts[dsl_name] = amt
+                outlet_amounts_dsl[dsl_name] = amt
 
         # Extract aqueous properties if available
         try:
@@ -563,6 +638,49 @@ class IDAESFlowsheetBuilder:
             outlet.Eh_mV = float(aprops.Eh()) * 1000.0
         except Exception:
             pass
+
+        # -----------------------------------------------------------------
+        # Compute equilibrium-derived KPIs (conversion per species)
+        # -----------------------------------------------------------------
+        if is_geo:
+            rxn_kpis: Dict[str, Dict[str, float]] = {}
+            equilibrium_kpis: Dict[str, float] = {}
+
+            # Compute delta for every species involved
+            all_species = set(inlet_amounts_dsl.keys()) | set(outlet_amounts_dsl.keys())
+            for sp in sorted(all_species):
+                n_in = inlet_amounts_dsl.get(sp, 0.0)
+                n_out = outlet_amounts_dsl.get(sp, 0.0)
+                delta = n_out - n_in
+                if abs(delta) > 1e-10:
+                    equilibrium_kpis[sp] = round(delta, 6)
+
+            # Compute conversions for reactant species (negative delta)
+            for sp, delta in list(equilibrium_kpis.items()):
+                n_in = inlet_amounts_dsl.get(sp, 0.0)
+                if n_in > 1e-10 and delta < 0:
+                    conversion = abs(delta) / n_in
+                    equilibrium_kpis[f"{sp}_conversion"] = round(conversion, 6)
+
+            rxn_kpis["equilibrium"] = {
+                "extent_mol": sum(abs(d) for d in equilibrium_kpis.values()
+                                  if not isinstance(d, str)),
+                **equilibrium_kpis,
+            }
+            unit.params["_reaction_kpis"] = rxn_kpis
+
+            _log.info(
+                "Reactor %s equilibrium: %s",
+                unit.id,
+                ", ".join(
+                    f"{sp}={d:+.4f}"
+                    for sp, d in sorted(equilibrium_kpis.items())
+                    if not sp.endswith("_conversion")
+                ),
+            )
+
+        # Update total outlet flow
+        outlet.flow_mol = sum(v for v in outlet.species_amounts.values() if v > 0)
 
         outlets = {}
         for out_name in unit.outputs:
@@ -1022,13 +1140,22 @@ class IDAESFlowsheetBuilder:
             species_amounts=merged_species,
         )
 
-    def _get_rkt_system(self):
+    def _get_rkt_system(self, unit_params: Optional[Dict] = None):
         """Get or create the Reaktoro ChemicalSystem.
 
         Supports REE presets (``"light_ree"``, ``"heavy_ree"``, ``"full_ree"``)
         via :func:`~sep_agents.properties.ree_databases.build_ree_system`,
         GeoH2 databases (``"SUPRCRT - BL"`` etc.), or a minimal fallback.
+
+        If *unit_params* contains ``"equilibrium_phases"``, a dedicated
+        geo-mineral system is built for that reactor (not cached globally).
         """
+        # ----------------------------------------------------------
+        # Unit-level geo-mineral system (per-reactor, not cached)
+        # ----------------------------------------------------------
+        if unit_params and "equilibrium_phases" in unit_params:
+            return self._build_geo_system(unit_params)
+
         if self._rkt_system is not None:
             return self._rkt_system
 
@@ -1060,6 +1187,46 @@ class IDAESFlowsheetBuilder:
 
         return self._rkt_system
 
+    def _build_geo_system(self, unit_params: Dict):
+        """Build a Reaktoro ChemicalSystem with mineral phases for Gibbs
+        equilibrium.
+
+        Parameters are read from ``unit_params``:
+
+        - ``equilibrium_phases`` : list[str]
+            Mineral phase names (Reaktoro names, e.g. ``"Forsterite"``).
+        - ``gas_phases`` : list[str], optional
+            Gaseous species to include (default: ``["H2(g)", "CO2(g)",
+            "H2O(g)", "O2(g)"]``).
+        - ``aqueous_elements`` : str, optional
+            Space-separated element symbols for the aqueous phase
+            (default: ``"H O C Si Mg Fe"``).
+        - ``database`` : str, optional
+            Reaktoro database name (default: ``"supcrtbl"``).
+        """
+        db_name = unit_params.get("database", "supcrtbl")
+        mineral_names = unit_params["equilibrium_phases"]
+        gas_species = unit_params.get(
+            "gas_phases", ["H2(g)", "CO2(g)", "H2O(g)", "O2(g)"],
+        )
+        aq_elements = unit_params.get("aqueous_elements", "H O C Si Mg Fe")
+
+        db = rkt.SupcrtDatabase(db_name)
+        phases = rkt.Phases(db)
+        phases.add(rkt.AqueousPhase(rkt.speciate(aq_elements)))
+        if gas_species:
+            phases.add(rkt.GaseousPhase(" ".join(gas_species)))
+        for mineral in mineral_names:
+            phases.add(rkt.MineralPhase(mineral))
+
+        system = rkt.ChemicalSystem(phases)
+        _log.info(
+            "Built geo-mineral system: %d species, %d phases (%s)",
+            system.species().size(), system.phases().size(),
+            ", ".join(mineral_names),
+        )
+        return system
+
     @staticmethod
     def _compute_kpis(
         flowsheet: Flowsheet, states: Dict[str, StreamState],
@@ -1088,8 +1255,8 @@ class IDAESFlowsheetBuilder:
                         out_st.flow_mol / in_st.flow_mol, 4
                     )
 
-            # -- Stoichiometric reactor KPIs (generic) --
-            if unit.type in STOICHIOMETRIC_REACTOR_TYPES:
+            # -- Reactor KPIs (stoichiometric and equilibrium) --
+            if unit.type in STOICHIOMETRIC_REACTOR_TYPES | EQUILIBRIUM_REACTOR_TYPES:
                 rxn_kpis = unit.params.get("_reaction_kpis", {})
                 for rxn_name, rxn_data in rxn_kpis.items():
                     for key, val in rxn_data.items():
@@ -1113,11 +1280,11 @@ class IDAESFlowsheetBuilder:
             kpis["overall.hx_duty_kW"] = round(total_duty_kW, 2)
 
         # -- Derived species-level aggregates --
-        # Scan all stoichiometric reactor KPIs for species production
+        # Scan all reactor KPIs for species production
         # and auto-generate overall.{species}_mol totals
         species_totals: Dict[str, float] = {}
         for unit in flowsheet.units:
-            if unit.type in STOICHIOMETRIC_REACTOR_TYPES:
+            if unit.type in STOICHIOMETRIC_REACTOR_TYPES | EQUILIBRIUM_REACTOR_TYPES:
                 rxn_kpis = unit.params.get("_reaction_kpis", {})
                 for rxn_data in rxn_kpis.values():
                     for key, val in rxn_data.items():
