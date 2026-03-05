@@ -1,0 +1,117 @@
+# Steel Slag Valorization – Feed Characterization
+# =================================================
+# BOF (Basic Oxygen Furnace) steel slag
+# Typical composition: CaO 40%, Fe2O3 15%, FeO 15%, SiO2 20%, MgO 10%
+#
+# Value streams identified:
+#   1. H2 via serpentinization of fayalite (Fe2SiO4)
+#   2. CO2 sequestration via mineral carbonation (CaO + MgO + CO2 → CaCO3/MgCO3)
+#   3. Iron recovery (magnetite/hematite concentrate)
+#
+# Key Reaktoro findings:
+#   - Serpentinization (250°C, 100 bar): thermodynamically favorable but
+#     equilibrium conversion only ~0.7% (kinetics-limited, needs long residence)
+#   - Carbonation requires pH > 7; direct slag dissolution gives pH ~2-4
+#     due to Fe3+ hydrolysis → need iron removal BEFORE carbonation
+#   - H2 produced as dissolved H2(aq) at 250°C; need gas-liquid separation
+
+name: steel_slag_valorization
+
+streams:
+  # ── Primary feed: BOF steel slag slurry ─────────────────────────
+  # Basis: 200g slag per kg water (20 wt% solids)
+  # Dissolved species basis for Reaktoro equilibrium
+  - name: slag_water_feed
+    phase: liquid
+    temperature_K: 298.15
+    pressure_Pa: 101325
+    composition_wt:
+      H2O(aq): 55.5           # 1 kg water
+      # CaO 40% → Ca²⁺ in solution
+      Ca+2: 1.427              # mol (from 80g CaO)
+      # MgO 10% → Mg²⁺
+      Mg+2: 0.496              # mol (from 20g MgO)
+      # Fe2O3 15% → Fe³⁺
+      Fe+3: 0.376              # mol (from 30g Fe2O3)
+      # FeO 15% → Fe²⁺
+      Fe+2: 0.417              # mol (from 30g FeO)
+      # SiO2 20% → dissolved silica
+      SiO2(aq): 0.666          # mol (from 40g SiO2)
+      # Charge balance
+      Cl-: 5.8                 # mol (charge balance)
+    pH: 2.43                   # Reaktoro-predicted ambient pH
+
+  # ── CO2 feed for mineral carbonation ────────────────────────────
+  - name: co2_feed
+    phase: gas
+    temperature_K: 298.15
+    pressure_Pa: 5000000       # 50 bar
+    composition_wt:
+      CO2: 44.0                # kg (1 kmol)
+
+  # ── Water makeup for serpentinization ────────────────────────────
+  - name: water_feed
+    phase: liquid
+    temperature_K: 298.15
+    pressure_Pa: 101325
+    composition_wt:
+      H2O(aq): 55.5
+
+units:
+  # ── Stage 1: Magnetic Separation ────────────────────────────────
+  # Recovers magnetite (Fe3O4) and hematite as iron concentrate
+  - id: mag_sep
+    type: lims
+    params:
+      magnetic_recovery: 0.85
+      field_T: 0.3
+    inputs: [slag_water_feed]
+    outputs: [fe_concentrate, non_magnetic_slag]
+
+  # ── Stage 2: Serpentinization Reactor ───────────────────────────
+  # Fe2SiO4 + 3H2O → 2Fe(OH)2 + SiO2 + H2
+  - id: serp_reactor
+    type: serpentinization_reactor
+    params:
+      residence_time_s: 14400    # 4 hours
+      T_C: 250
+      p_bar: 100
+      conversion: 0.70
+      tank_volume_m3: 10.0
+    inputs: [non_magnetic_slag]
+    outputs: [serp_product]
+
+  # ── Stage 3: H2 Gas Separation ─────────────────────────────────
+  - id: h2_separator
+    type: separator
+    params:
+      recovery: 0.95
+      split_fraction: 0.99
+    inputs: [serp_product]
+    outputs: [h2_gas_product, serp_liquid]
+
+  # ── Stage 4: Carbonation Reactor ────────────────────────────────
+  # CaO + CO2 → CaCO3; MgO + CO2 → MgCO3
+  - id: carbonation_mixer
+    type: mixer
+    params: {}
+    inputs: [serp_liquid, co2_feed]
+    outputs: [carbonation_feed]
+
+  - id: carbonation
+    type: carbonation_reactor
+    params:
+      residence_time_s: 7200     # 2 hours
+      T_C: 185
+      p_bar: 50
+      conversion: 0.80
+    inputs: [carbonation_feed]
+    outputs: [carbonation_product]
+
+  # ── Stage 5: Solids Recovery ────────────────────────────────────
+  - id: thickener
+    type: thickener
+    params:
+      recovery: 0.90
+    inputs: [carbonation_product]
+    outputs: [carbonate_solids, residual_liquor]

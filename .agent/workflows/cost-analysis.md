@@ -29,3 +29,14 @@ When the user requests a cost analysis or techno-economic assessment, follow the
    - Format as a table with parameter name and marginal cost impact
 
 5. Present all tables using standard Markdown table syntax with aligned columns.
+
+---
+
+## Related Workflows
+
+For comprehensive valorization analysis with GDP superstructure optimization and formal LaTeX reporting, see:
+- `/resource-characterization` — Feed intake and speciation
+- `/superstructure-selection` — GDP candidate identification
+- `/process-optimization` — Full GDP optimization and trade studies (includes cost analysis)
+- `/valorization-report` — LaTeX technical report
+- `/valorization-presentation` — Beamer slide deck
