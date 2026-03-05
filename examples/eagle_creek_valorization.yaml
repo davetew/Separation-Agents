@@ -1,0 +1,150 @@
+# Eagle Creek Ni-Cu Mine Tailings Valorization Flowsheet
+# =====================================================
+# Valorization of Ni/Cu tailings for:
+#   1. Metal recovery (Cu, Ni) via acid leach + SX
+#   2. CO2 mineralization of Mg-silicates (carbon credits)
+#   3. H2SO4 production from pyrrhotite roasting (acid self-supply)
+#   4. Fe3O4 magnetite concentrate (iron product)
+#
+# Nominal tailings composition (mole fraction basis):
+#   45% Forsterite (Mg2SiO4), 15% Enstatite (MgSiO3),
+#   10% Pyrrhotite (FeS), 15% Anorthite (CaAl2Si2O8),
+#   10% Lizardite (Mg3Si2O5(OH)4), 5% Magnetite (Fe3O4)
+#   Residual metals: 0.7 wt% Ni, 0.9 wt% Cu
+
+name: eagle_creek_tailings_valorization
+
+streams:
+  # Primary feed: tailings slurry (aqueous species basis for Reaktoro)
+  # Mole-fraction converted to approximate species amounts
+  # Basis: 100 mol total feed
+  - name: tailings_feed
+    phase: liquid
+    temperature_K: 298.15
+    pressure_Pa: 101325
+    composition_wt:
+      # Water carrier
+      H2O(aq): 55.5
+      # Mg from forsterite (45 mol × 2 Mg) + enstatite (15 × 1 Mg) + lizardite (10 × 3 Mg)
+      Mg+2: 0.135
+      # Si from forsterite (45 × 1) + enstatite (15 × 1) + anorthite (15 × 2) + lizardite (10 × 2)
+      SiO2(aq): 0.110
+      # Fe from pyrrhotite (10 mol) + magnetite (5 × 3 Fe)
+      Fe+2: 0.025
+      Fe+3: 0.010
+      # Ca from anorthite (15 × 1)
+      Ca+2: 0.015
+      # Al from anorthite (15 × 2)
+      Al+3: 0.030
+      # S from pyrrhotite (10 mol)
+      SO4-2: 0.010
+      # Residual Cu and Ni (trace)
+      # Using simple ion proxies
+      Na+: 0.009     # Ni proxy (0.7 wt%)
+      K+: 0.012      # Cu proxy (0.9 wt%)
+      # Chloride for charge balance
+      Cl-: 0.05
+
+  # Acid solution for leaching
+  - name: acid_solution
+    phase: liquid
+    temperature_K: 298.15
+    pressure_Pa: 101325
+    composition_wt:
+      H2O(aq): 55.5
+      HSO4-: 1.0
+    pH: 1.0
+
+  # CO2 feed for mineralization
+  - name: co2_feed
+    phase: liquid
+    temperature_K: 298.15
+    pressure_Pa: 1013250   # 10 bar for carbonation
+    composition_wt:
+      H2O(aq): 55.5
+      CO2(aq): 2.0
+
+units:
+  # ── Stage 1: Magnetic Separation ────────────────────────────────────
+  # Recovers magnetite (Fe3O4) as iron concentrate
+  - id: mag_sep
+    type: lims
+    params:
+      magnetic_recovery: 0.85
+      field_T: 0.1
+    inputs: [tailings_feed]
+    outputs: [fe_concentrate, non_magnetic]
+
+  # ── Stage 2: Sulfide Flotation ──────────────────────────────────────
+  # Floats pyrrhotite from silicate gangue
+  # Pyrrhotite concentrate → roaster for H2SO4 production
+  - id: sulfide_float
+    type: flotation_bank
+    params:
+      k_s_1ps: 0.02
+      R_inf: 0.70
+      air_rate_m3m2s: 0.015
+      stages: 4
+    inputs: [non_magnetic]
+    outputs: [sulfide_conc, silicate_tails]
+
+  # ── Stage 3: Acid Leach (H2SO4) ────────────────────────────────────
+  # Mix silicate tails with H2SO4 to dissolve residual Cu/Ni
+  - id: leach_mixer
+    type: mixer
+    params: {}
+    inputs: [silicate_tails, acid_solution]
+    outputs: [leach_feed]
+
+  - id: leach_1
+    type: leach_reactor
+    params:
+      residence_time_s: 14400  # 4 hours
+      T_C: 80
+    inputs: [leach_feed]
+    outputs: [pregnant_solution]
+
+  # ── Stage 4: Cu/Ni Solvent Extraction ───────────────────────────────
+  # SX to selectively extract Cu and Ni from PLS
+  - id: sx_cu_ni
+    type: solvent_extraction
+    params:
+      distribution_coeff:
+        Na+: 8.0    # Ni proxy - high extraction
+        K+: 12.0    # Cu proxy - very high extraction
+        Mg+2: 0.05  # Mg stays in aqueous (for carbonation)
+        Fe+2: 0.1
+        Fe+3: 0.15
+        Ca+2: 0.02
+        Al+3: 0.03
+      organic_to_aqueous_ratio: 1.5
+      stages: 3
+    inputs: [pregnant_solution]
+    outputs: [loaded_organic, mg_rich_raffinate]
+
+  # ── Stage 5: CO2 Mineralization ─────────────────────────────────────
+  # Mg-rich raffinate reacts with CO2 to form MgCO3
+  - id: carbonation_mixer
+    type: mixer
+    params: {}
+    inputs: [mg_rich_raffinate, co2_feed]
+    outputs: [carbonation_feed]
+
+  - id: carbonation
+    type: carbonation_reactor
+    params:
+      residence_time_s: 7200  # 2 hours
+      T_C: 185               # Elevated T for direct carbonation
+      p_bar: 10              # 10 bar CO2
+      conversion: 0.80       # 80% Mg carbonation efficiency
+    inputs: [carbonation_feed]
+    outputs: [carbonation_product]
+
+  # ── Stage 6: Final Thickener ────────────────────────────────────────
+  # Separate MgCO3 + SiO2 solids from residual liquor
+  - id: thickener_1
+    type: thickener
+    params:
+      recovery: 0.90
+    inputs: [carbonation_product]
+    outputs: [carbonate_solids, residual_liquor]

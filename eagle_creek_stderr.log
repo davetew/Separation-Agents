@@ -1,0 +1,6 @@
+Traceback (most recent call last):
+  File "/Users/davidtew/Library/CloudStorage/GoogleDrive-davetew@step-function.com/My Drive/Github/Separation-Agents/examples/eagle_creek_valorization.py", line 22, in <module>
+    from sep_agents.sim.idaes_adapter import IDAESFlowsheetBuilder
+  File "/Users/davidtew/Library/CloudStorage/GoogleDrive-davetew@step-function.com/My Drive/Github/Separation-Agents/src/sep_agents/sim/idaes_adapter.py", line 30, in <module>
+    from pyomo.environ import ConcreteModel, value as pyo_value
+ModuleNotFoundError: No module named 'pyomo'

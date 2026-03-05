@@ -53,7 +53,7 @@ except Exception:
 # Unit type classification
 # ---------------------------------------------------------------------------
 SEPARATOR_TYPES = {"cyclone", "lims", "flotation_bank", "thickener"}
-REACTOR_TYPES = {"leach_reactor"}
+REACTOR_TYPES = {"leach_reactor", "carbonation_reactor", "serpentinization_reactor"}
 MIXER_TYPES = {"mixer"}
 SX_TYPES = {"solvent_extraction"}
 IX_TYPES = {"ion_exchange"}
@@ -651,7 +651,7 @@ class IDAESFlowsheetBuilder:
         org_out.species_amounts = {}
         
         # Aqueous background species that shouldn't extract
-        aq_background = {"H2O", "H2O(aq)", "H+", "OH-", "Cl-", "HCl(aq)", "Na+", "Ca+2"}
+        aq_background = {"H2O", "H2O(aq)", "H+", "OH-", "Cl-", "HCl(aq)"}
         
         for sp, amt in inlet.species_amounts.items():
             if sp in aq_background or sp.endswith("(aq)") and not any(elem in sp for elem in ["Ce", "Nd", "La", "Pr", "Y", "Dy", "Fe"]):

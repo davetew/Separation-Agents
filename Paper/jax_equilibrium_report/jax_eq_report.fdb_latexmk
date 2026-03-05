@@ -1,5 +1,5 @@
 # Fdb version 4
-["pdflatex"] 1772591378.63993 "jax_eq_report.tex" "jax_eq_report.pdf" "jax_eq_report" 1772591389.12636 2
+["pdflatex"] 1772591408.56104 "jax_eq_report.tex" "jax_eq_report.pdf" "jax_eq_report" 1772591409.14958 0
   "/usr/local/texlive/2025/texmf-dist/fonts/enc/dvips/cm-super/cm-super-ts1.enc" 1136849721 2900 1537cc8184ad1792082cd229ecc269f4 ""
   "/usr/local/texlive/2025/texmf-dist/fonts/map/fontname/texfonts.map" 1577235249 3524 cb3e574dea2d1052e39280babc910dc8 ""
   "/usr/local/texlive/2025/texmf-dist/fonts/tfm/jknappen/ec/tcrm1095.tfm" 1136768653 1536 02c06700a42be0f5a28664c7273f82e7 ""
@@ -35,6 +35,7 @@
   "/usr/local/texlive/2025/texmf-dist/fonts/type1/public/amsfonts/cm/cmmi8.pfb" 1248133631 35469 70d41d2b9ea31d5d813066df7c99281c ""
   "/usr/local/texlive/2025/texmf-dist/fonts/type1/public/amsfonts/cm/cmr10.pfb" 1248133631 35752 024fb6c41858982481f6968b5fc26508 ""
   "/usr/local/texlive/2025/texmf-dist/fonts/type1/public/amsfonts/cm/cmr12.pfb" 1248133631 32722 d7379af29a190c3f453aba36302ff5a9 ""
+  "/usr/local/texlive/2025/texmf-dist/fonts/type1/public/amsfonts/cm/cmr6.pfb" 1248133631 32734 69e00a6b65cedb993666e42eedb3d48f ""
   "/usr/local/texlive/2025/texmf-dist/fonts/type1/public/amsfonts/cm/cmr8.pfb" 1248133631 32726 0a1aea6fcd6468ee2cf64d891f5c43c8 ""
   "/usr/local/texlive/2025/texmf-dist/fonts/type1/public/amsfonts/cm/cmsy10.pfb" 1248133631 32569 5e5ddc8df908dea60932f3c484a54c0d ""
   "/usr/local/texlive/2025/texmf-dist/fonts/type1/public/amsfonts/cm/cmsy8.pfb" 1248133631 32626 4f5c1b83753b1dd3a97d1b399a005b4b ""
@@ -109,9 +110,9 @@
   "/usr/local/texlive/2025/texmf-var/fonts/map/pdftex/updmap/pdftex.map" 1763781159 5467155 19efa205003f9ecad95fbbaa6ff24da1 ""
   "/usr/local/texlive/2025/texmf-var/web2c/pdftex/pdflatex.fmt" 1741450574 3345740 46b66fdb0378f7bf5921b5eabf1762b8 ""
   "/usr/local/texlive/2025/texmf.cnf" 1741450484 577 418a7058ec8e006d8704f60ecd22c938 ""
-  "jax_eq_report.aux" 1772591389.00294 932 620ab4d07ca012eb549ce4cf452d1294 "pdflatex"
-  "jax_eq_report.out" 1772591389.00306 1256 b8f6e3279baa082a8c519dd6f520223b "pdflatex"
-  "jax_eq_report.tex" 1772591369.87346 8812 117def34d344bd81c48f3ae065edd91d ""
+  "jax_eq_report.aux" 1772591409.08061 1611 b20e22cba3235b429d02df4283361774 "pdflatex"
+  "jax_eq_report.out" 1772591409.08102 1753 4301271ab77cd0ee3268fa72ee854a98 "pdflatex"
+  "jax_eq_report.tex" 1772591398.14509 8830 17c1d0f676a68e354e3ea6972f2bc2f0 ""
   (generated)
   "jax_eq_report.aux"
   "jax_eq_report.log"

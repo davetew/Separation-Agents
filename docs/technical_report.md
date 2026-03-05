@@ -19,7 +19,8 @@
    - 3.2 [Domain-Specific Language (DSL)](#32-domain-specific-language-dsl)
    - 3.3 [Unit Operation Models](#33-unit-operation-models)
    - 3.4 [Equation-Oriented (EO) Flowsheet Solver](#34-equation-oriented-eo-flowsheet-solver)
-   - 3.5 [Generalized Disjunctive Programming (GDP)](#35-generalized-disjunctive-programming-gdp)
+   - 3.5 [JAX-Based Equilibrium Solver](#35-jax-based-equilibrium-solver)
+   - 3.6 [Generalized Disjunctive Programming (GDP)](#36-generalized-disjunctive-programming-gdp)
 4. [Thermodynamic Property Models](#4-thermodynamic-property-models)
    - 4.1 [Reaktoro and the SUPCRTBL Database](#41-reaktoro-and-the-supcrtbl-database)
    - 4.2 [REE Database Configuration](#42-ree-database-configuration)
@@ -28,6 +29,7 @@
 5. [Techno-Economic Analysis (TEA)](#5-techno-economic-analysis-tea)
    - 5.1 [OPEX Estimation Model](#51-opex-estimation-model)
    - 5.2 [Life Cycle Assessment (LCA)](#52-life-cycle-assessment-lca)
+   - 5.3 [JAX-Based Differentiable Cost Estimation](#53-jax-based-differentiable-cost-estimation)
 6. [Bayesian Optimization with BoTorch](#6-bayesian-optimization-with-botorch)
    - 6.1 [Problem Formulation](#61-problem-formulation)
    - 6.2 [Gaussian Process Surrogate](#62-gaussian-process-surrogate)
@@ -257,7 +259,25 @@ Recovery is capped at $\leq 1.0$ using slack decomposition: `raw_frac = recovery
 | GDP compatibility | Enumeration only | Native Pyomo.GDP |
 | Recycles | Not supported | Not supported (planned) |
 
-### 3.5 Generalized Disjunctive Programming (GDP)
+### 3.5 JAX-Based Equilibrium Solver
+
+To enable end-to-end differentiable flowsheet optimization, a pure-JAX implementation of chemical equilibrium via constrained Gibbs energy minimization (GEM) is provided ([`src/sep_agents/sim/jax_equilibrium.py`](../src/sep_agents/sim/jax_equilibrium.py)).
+
+#### Formulation
+
+The solver minimizes the total Gibbs energy of the system:
+
+$$\min_{n} G(T, P, \mathbf{n}) = \sum_i n_i \mu_i(T, P, \mathbf{n})$$
+
+subject to elemental mass balances $\mathbf{A}\mathbf{n} = \mathbf{b}$ and non-negativity $n_i \ge 0$.
+
+Key differences and advantages compared to the Reaktoro backend:
+1. **Fully Differentiable**: Gradients of equilibrium states (pH, Eh, species amounts) with respect to inputs (T, P, feed compositions) can be obtained directly via `jax.grad` or `jax.jacfwd`.
+2. **Built-in Thermodynamics**: Implements the extended Debye-Hückel (B-dot) activity model for aqueous species, natively evaluating temperature-dependent parameters (A, B, Bdot coefficients).
+3. **Advanced State Corrections**: Natively computes temperature and pressure phase corrections using the Helgeson-Kirkham-Flowers (HKF) equations of state for aqueous species, Holland-Powell thermal properties for minerals, and Peng-Robinson fugacity coefficients for gases.
+4. **Log-Space Optimization**: Solves the constrained GEM entirely in log-space ($y_i = \log(n_i + \epsilon)$) using `jaxopt.LBFGSB` to guarantee strict positivity and differentiability without manual constraint projection.
+
+### 3.6 Generalized Disjunctive Programming (GDP)
 
 The GDP module ([`src/sep_agents/opt/gdp_eo.py`](../src/sep_agents/opt/gdp_eo.py)) enables **superstructure optimization** — simultaneously selecting the best process topology and optimizing continuous operating parameters.
 
@@ -458,6 +478,26 @@ The LCA model ([`src/sep_agents/cost/lca.py`](../src/sep_agents/cost/lca.py)) mi
 | Grid electricity | 0.45 kg/kWh | Global average grid mix |
 
 These are **proxy values** suitable for screening-level comparisons.  For publication-grade LCA, process-specific emission factors from ecoinvent or GREET databases should be used.
+
+### 5.3 JAX-Based Differentiable Cost Estimation
+
+To directly interface with gradient-descent and Bayesian Optimization frameworks, a fully differentiable Techno-Economic Analysis (TEA) module is implemented ([`src/sep_agents/cost/jax_tea.py`](../src/sep_agents/cost/jax_tea.py)). This completely pure-JAX approach allows for backpropagating gradients of the Equivalent Annualized Cost (EAC) directly to flowsheet operating parameters (e.g., $d(EAC)/d(reagent\_dosage)$) in a single backward pass.
+
+#### Capabilities
+
+The JAX cost module calculates proxy CAPEX and OPEX for the lifecycle of a flowsheet:
+1. **Mining Cost**: Functions evaluating overall plant throughput ($tpd$), depth multipliers ($cost/m$), and strip ratios mapping the penalty of waste-to-ore handling.
+2. **Comminution Cost**: Predicts crushing and milling capacity parameters utilizing a differentiable adaptation of the Bond Work Index equation to scale baseline electricity requirements.
+3. **Leaching Cost**: Models the core hydrometallurgical extraction block, combining residence time-driven CAPEX with temperature-dependent heating penalties (DT over ambient) and linear acid-dosing costs.
+4. **Processing Cost**: Approximates solvent extraction stages via a scalable sizing proxy anchored to flow rate $m^3/h$, adding reagent bounds for precipitation circuits.
+
+#### Key Cost Assumptions & Proxy References
+
+*   **Mining Scale**: CAPEX proxy scales sub-linearly with plant capacity (the 0.6 rule of thumb approximation; $Cost \propto Capacity^{0.6}$), while OPEX evaluates linearly per ton of feed ore. Base operating assumption is 330 operational days a year.
+*   **Comminution Hardness**: Hardness scales energy usage from a 10 kWh/t baseline dynamically adjusted by the Bond Work Index multiplying over a local electricity cost proxy ($0.08 / kWh).
+*   **Reagent Valuation**: Modeled identically to the base TEA, assuming bulk industrial scale pricing (e.g. Acid: $150 / ton, SX stages scaling dynamically). 
+
+> **Provenance**: The parameters utilized by `jax_tea.py` serve as synthetic proxy placeholders designed to reflect broad, heuristic-level estimations comparable to preliminary O'Hara methods for feasibility studies. 
 
 ---
 
