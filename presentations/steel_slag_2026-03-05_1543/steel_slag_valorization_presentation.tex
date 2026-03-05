@@ -1,0 +1,394 @@
+\documentclass[aspectratio=169]{beamer}
+
+% --- Step Function Branding ---
+\usepackage{sf-branding}
+
+% --- Additional packages ---
+\usepackage{appendixnumberbeamer}
+\usepackage{amsmath,amssymb}
+\usepackage{siunitx}
+\sisetup{group-separator={,}, group-minimum-digits=4}
+\usepackage{graphicx}
+\usepackage{booktabs}
+\usepackage{tikz}
+\usetikzlibrary{arrows.meta,positioning,shapes.geometric}
+\usepackage{array}
+\usepackage{colortbl}
+
+% Custom data colors (non-clashing)
+\definecolor{revenue}{HTML}{00CC66}
+\definecolor{cost}{HTML}{EF4444}
+
+\title{Techno-Economic Assessment of\\[4pt] \textbf{Steel Slag (BOF)} Valorization}
+\subtitle{H\textsubscript{2} Production \(\cdot\) CO\textsubscript{2} Mineralization \(\cdot\) Iron Recovery}
+\author{Step Function}
+\date{\today}
+
+\begin{document}
+
+% === TITLE ===
+\begin{frame}
+\titlepage
+\end{frame}
+
+% === OUTLINE ===
+\begin{frame}{Outline}
+\tableofcontents
+\end{frame}
+
+% ═══════════════════════════════════════════════════════════
+\section{Background \& Opportunity}
+% ═══════════════════════════════════════════════════════════
+
+\begin{frame}{The Steel Slag Challenge}
+\framesub{200+ Mt/yr generated globally, much landfilled}
+
+\begin{itemize}
+  \item BOF steel slag: primary by-product of steelmaking (\SI{100}{}-\SI{200}{kg/t} steel)
+  \item Rich in \textbf{CaO} (40\%), \textbf{FeO} (20\%), \textbf{SiO\textsubscript{2}} (15\%), \textbf{MgO} (8\%)
+  \item Minor: MnO (5\%), Cr\textsubscript{2}O\textsubscript{3} (2\%), V\textsubscript{2}O\textsubscript{5} (0.5\%)
+  \item Multiple simultaneous valorization pathways
+\end{itemize}
+
+\vspace{10pt}
+\textbf{Study scope:} \SI{500}{t/d} BOF slag $\rightarrow$ H\textsubscript{2} + CaCO\textsubscript{3} + Fe concentrate
+\end{frame}
+
+\begin{frame}{Feed Composition}
+\framesub{BOF slag bulk oxide analysis}
+
+\centering
+\begin{tabular}{lcc}
+\toprule
+\textbf{Oxide} & \textbf{wt\%} & \textbf{Value Stream} \\
+\midrule
+CaO          & 40.0 & CO\textsubscript{2} carbonation \\
+FeO          & 20.0 & Iron recovery, H\textsubscript{2} \\
+SiO\textsubscript{2} & 15.0 & Aggregate \\
+MgO          &  8.0 & CO\textsubscript{2} carbonation \\
+Al\textsubscript{2}O\textsubscript{3} &  5.0 & Aggregate \\
+MnO          &  5.0 & Manganese \\
+Cr\textsubscript{2}O\textsubscript{3} &  2.0 & Ferrochrome \\
+V\textsubscript{2}O\textsubscript{5} &  0.5 & Ferrovanadium \\
+\bottomrule
+\end{tabular}
+\end{frame}
+
+\begin{frame}{Speciation Results}
+\framesub{HCl acid leach at 25\textdegree C --- Reaktoro thermodynamic engine}
+
+\begin{columns}[T]
+\begin{column}{0.45\textwidth}
+\textbf{Conditions:}
+\begin{itemize}
+  \item pH = \textbf{1.09}
+  \item Eh = \SI{0.14}{V}
+  \item Ionic strength = \SI{2.14}{mol/kg}
+\end{itemize}
+\end{column}
+\begin{column}{0.55\textwidth}
+\textbf{Dominant aqueous species:}
+
+\begin{tabular}{lc}
+\toprule
+\textbf{Species} & \textbf{mol/kg} \\
+\midrule
+Cl\textsuperscript{$-$} & 1.24 \\
+Ca\textsuperscript{2+}  & 0.25 \\
+Fe\textsuperscript{2+}  & 0.13 \\
+SiO\textsubscript{2}    & 0.09 \\
+Mg\textsuperscript{2+}  & 0.07 \\
+Al\textsuperscript{3+}  & 0.07 \\
+Mn\textsuperscript{2+}  & 0.03 \\
+\bottomrule
+\end{tabular}
+\end{column}
+\end{columns}
+\end{frame}
+
+% ═══════════════════════════════════════════════════════════
+\section{Process Design}
+% ═══════════════════════════════════════════════════════════
+
+\begin{frame}{Process Flow Diagram}
+\framesub{Config-4: Minimal topology (no aux heater, no scrubber)}
+
+\centering
+\begin{tikzpicture}[
+  node distance=0.9cm and 1.6cm,
+  unit/.style={rectangle, draw=StepGrey, rounded corners, minimum width=2.2cm,
+               minimum height=0.55cm, align=center, fill=StepElectric!15,
+               font=\scriptsize, text=white},
+  hx/.style={rectangle, draw=StepGrey, rounded corners, minimum width=1.6cm,
+             minimum height=0.45cm, align=center, fill=StepOrange!15,
+             font=\tiny, text=white},
+  product/.style={rectangle, draw=StepGrey, rounded corners, minimum width=1.6cm,
+                  minimum height=0.45cm, align=center, fill=StepGreen!15,
+                  font=\tiny\itshape, text=white},
+  feed/.style={rectangle, draw=StepGrey, rounded corners, minimum width=1.6cm,
+               minimum height=0.45cm, align=center, fill=StepYellow!20,
+               font=\scriptsize, text=white},
+  stream/.style={-{Stealth[length=2mm]}, StepGrey, thick},
+]
+  \node[feed] (slag) {Slag 500 t/d};
+  \node[feed, right=2.5cm of slag] (co2) {CO\textsubscript{2}};
+  \node[unit, below=0.7cm of slag] (pump1) {Pump};
+  \node[unit, below=0.7cm of co2] (pump2) {Pump};
+  \node[hx, below=0.6cm of pump1] (hx1) {HX Preheat};
+  \node[hx, below=0.6cm of pump2] (hx2) {HX Preheat};
+  \node[unit, below=0.6cm of hx1, fill=StepRed!20] (serp) {Serpentinization\\300\textdegree C, 50 atm};
+  \node[unit, below=0.6cm of hx2, fill=StepRed!20] (carb) {Carbonation\\180\textdegree C, 30 atm};
+  \node[hx, below=0.6cm of serp] (hx3) {HX Recovery};
+  \node[hx, below=0.6cm of carb] (hx4) {HX Recovery};
+  \node[unit, below=0.6cm of hx3] (sep1) {H\textsubscript{2} Sep};
+  \node[unit, below=0.6cm of hx4] (sep2) {Carb Sep};
+  \node[product, below left=0.5cm and 0cm of sep1] (h2) {H\textsubscript{2}};
+  \node[product, below right=0.5cm and 0cm of sep1] (fe) {Fe Conc};
+  \node[product, below=0.5cm of sep2] (caco3) {CaCO\textsubscript{3}};
+
+  \draw[stream] (slag) -- (pump1);
+  \draw[stream] (co2) -- (pump2);
+  \draw[stream] (pump1) -- (hx1);
+  \draw[stream] (pump2) -- (hx2);
+  \draw[stream] (hx1) -- (serp);
+  \draw[stream] (hx2) -- (carb);
+  \draw[stream] (serp) -- (hx3);
+  \draw[stream] (carb) -- (hx4);
+  \draw[stream] (hx3) -- (sep1);
+  \draw[stream] (hx4) -- (sep2);
+  \draw[stream] (sep1) -- (h2);
+  \draw[stream] (sep1) -- (fe);
+  \draw[stream] (sep2) -- (caco3);
+
+  \draw[stream, dashed, StepGrey!60] (hx3.west) -- +(-0.6,0) |- (hx1.west);
+  \draw[stream, dashed, StepGrey!60] (hx4.east) -- +(0.6,0) |- (hx2.east);
+\end{tikzpicture}
+\end{frame}
+
+\begin{frame}{Key Reactions}
+\framesub{Serpentinization and mineral carbonation}
+
+\textbf{H\textsubscript{2} Production (Serpentinization):}
+\begin{equation*}
+  3\text{Fe}_2\text{SiO}_4 + 2\text{H}_2\text{O}
+  \longrightarrow 2\text{Fe}_3\text{O}_4 + 3\text{SiO}_2 + 2\text{H}_2 \uparrow
+\end{equation*}
+
+\vspace{12pt}
+\textbf{CO\textsubscript{2} Sequestration (Mineral Carbonation):}
+\begin{equation*}
+  \text{CaO} + \text{CO}_2 \longrightarrow \text{CaCO}_3
+  \qquad\quad
+  \text{MgO} + \text{CO}_2 \longrightarrow \text{MgCO}_3
+\end{equation*}
+
+\vspace{12pt}
+\begin{itemize}
+  \item Serpentinization at \SI{300}{\celsius}, \SI{50}{atm} --- produces magnetite + H\textsubscript{2}
+  \item Carbonation at \SI{180}{\celsius}, \SI{30}{atm} --- permanent CO\textsubscript{2} storage
+\end{itemize}
+\end{frame}
+
+\begin{frame}{Modeling Methodology}
+\framesub{Three-tier simulation hierarchy}
+
+\centering
+\begin{tabular}{p{2.5cm}p{3.8cm}p{5cm}}
+\toprule
+\textbf{Tier} & \textbf{Tool} & \textbf{Application} \\
+\midrule
+Thermodynamic & Reaktoro GEM & Speciation, pH, activity \\
+Process & IDAES-PSE / Pyomo & Mass \& energy balances, GDP \\
+Economic & JAX TEA + autodiff & CAPEX/OPEX, EAC, sensitivities \\
+\bottomrule
+\end{tabular}
+\end{frame}
+
+% ═══════════════════════════════════════════════════════════
+\section{GDP Superstructure Analysis}
+% ═══════════════════════════════════════════════════════════
+
+\begin{frame}{Superstructure Overview}
+\framesub{15 units, 1 disjunction, 1 optional unit $\rightarrow$ 4 topologies}
+
+\begin{itemize}
+  \item \textbf{Disjunction:} Auxiliary heater vs.\ full heat recovery
+  \item \textbf{Optional unit:} Inter-reactor scrubber
+  \item \textbf{4 feasible topologies} enumerated and evaluated
+\end{itemize}
+
+\vspace{12pt}
+\centering
+\begin{tabular}{clcc}
+\toprule
+\textbf{Config} & \textbf{Description} & \textbf{Aux Heater} & \textbf{Scrubber} \\
+\midrule
+1 & Full & \checkmark & \checkmark \\
+2 & Heater only & \checkmark & --- \\
+3 & Heat recovery + scrub & --- & \checkmark \\
+4 & \textbf{Minimal} & --- & --- \\
+\bottomrule
+\end{tabular}
+\end{frame}
+
+\begin{frame}{Topology Ranking}
+\framesub{Config-4 (minimal) is optimal --- lowest EAC offsets lower recovery}
+
+\centering
+\begin{tabular}{clcccc}
+\toprule
+\textbf{Rank} & \textbf{Topology} & \textbf{EAC} & \textbf{Revenue} & \textbf{Net} & \textbf{\$/t} \\
+ & & (M\$/yr) & (M\$/yr) & (M\$/yr) & \\
+\midrule
+\rowcolor{StepGreen!10}
+1 & Minimal & 6.73 & 5.60 & $-$1.13 & $-$6.83 \\
+2 & Heat recv + scrub & 7.47 & 5.84 & $-$1.62 & $-$9.85 \\
+3 & Heater only & 8.96 & 5.72 & $-$3.24 & $-$19.65 \\
+4 & Full & 9.95 & 5.94 & $-$4.01 & $-$24.33 \\
+\bottomrule
+\end{tabular}
+\end{frame}
+
+% ═══════════════════════════════════════════════════════════
+\section{Results}
+% ═══════════════════════════════════════════════════════════
+
+\begin{frame}{Production Summary}
+\framesub{Config-4 annual production at 500 t/d, 330 d/yr}
+
+\centering
+\begin{tabular}{lccc}
+\toprule
+\textbf{Product} & \textbf{Production} & \textbf{Price} & \textbf{Revenue} \\
+\midrule
+H\textsubscript{2} gas & \SI{168}{t/yr} & \$4,000/t & \$673k/yr \\
+CO\textsubscript{2} credits & \SI{37884}{t/yr} & \$60/t & \$2,273k/yr \\
+Fe concentrate & \SI{23100}{t/yr} & \$120/t & \$2,772k/yr \\
+\midrule
+\textbf{Total} & & & \textbf{\$5,600k/yr} \\
+\bottomrule
+\end{tabular}
+\end{frame}
+
+\begin{frame}{Cost Breakdown}
+\framesub{Acid consumption dominates at 74\% of OPEX}
+
+\centering
+\begin{tabular}{lcc}
+\toprule
+\textbf{Cost Item} & \textbf{Annual} & \textbf{\$/t slag} \\
+\midrule
+Comminution (CAPEX + OPEX) & \$788k & 4.77 \\
+HCl acid (OPEX) & \textcolor{StepRed}{\$4,950k} & \textcolor{StepRed}{30.00} \\
+Leaching equipment (CAPEX) & \$400k & 2.42 \\
+Other processing & \$401k & 2.43 \\
+\midrule
+\textbf{Total EAC} & \textbf{\$6,730k} & \textbf{40.79} \\
+\bottomrule
+\end{tabular}
+
+\vspace{8pt}
+\textcolor{StepRed}{\textbf{Acid cost = 74\% of total}} --- key lever for economic improvement
+\end{frame}
+
+\begin{frame}{Net Value}
+\centering
+\vspace{1.5cm}
+{\Huge\textbf{\textcolor{StepRed}{$-$\$6.83/t}}}\\[12pt]
+{\large Net value per tonne of steel slag}\\[8pt]
+{\normalsize
+\textcolor{StepGreen}{Revenue: \$33.96/t} \quad
+\textcolor{StepRed}{Cost: \$40.79/t}}\\[20pt]
+{\small At current commodity prices (\$60/t CO\textsubscript{2}, \$4k/t H\textsubscript{2}, \$120/t Fe)}
+\end{frame}
+
+% ═══════════════════════════════════════════════════════════
+\section{Sensitivity \& Breakeven}
+% ═══════════════════════════════════════════════════════════
+
+\begin{frame}{CO\textsubscript{2} Credit Price Sensitivity}
+\framesub{Breakeven at \$90/t CO\textsubscript{2} --- within EU ETS range}
+
+\centering
+\begin{tabular}{ccc}
+\toprule
+\textbf{CO\textsubscript{2} Price (\$/t)} & \textbf{Net (M\$/yr)} & \textbf{Net/t (\$/t)} \\
+\midrule
+40  & $-$1.89 & $-$11.43 \\
+60  & $-$1.13 & $-$6.83 \\
+\rowcolor{StepYellow!15}
+80  & $-$0.37 & $-$2.24 \\
+\rowcolor{StepGreen!10}
+100 & $+$0.39 & $+$2.35 \\
+120 & $+$1.15 & $+$6.94 \\
+150 & $+$2.28 & $+$13.83 \\
+200 & $+$4.18 & $+$25.31 \\
+\bottomrule
+\end{tabular}
+\end{frame}
+
+\begin{frame}{Acid Consumption Sensitivity}
+\framesub{Breakeven at $\leq$100 kg HCl/t slag --- acid recycling pathway}
+
+\centering
+\begin{tabular}{ccc}
+\toprule
+\textbf{Acid (kg/t)} & \textbf{Net (M\$/yr)} & \textbf{Net/t (\$/t)} \\
+\midrule
+\rowcolor{StepGreen!10}
+50  & $+$1.35 & $+$8.17 \\
+\rowcolor{StepGreen!10}
+75  & $+$0.73 & $+$4.42 \\
+\rowcolor{StepGreen!10}
+100 & $+$0.11 & $+$0.67 \\
+125 & $-$0.51 & $-$3.08 \\
+150 & $-$1.13 & $-$6.83 \\
+200 & $-$2.37 & $-$14.33 \\
+\bottomrule
+\end{tabular}
+\end{frame}
+
+\begin{frame}{Top Cost Drivers}
+\framesub{JAX automatic differentiation of EAC}
+
+\centering
+\begin{tabular}{lcc}
+\toprule
+\textbf{Parameter} & \textbf{$\partial$EAC/$\partial$param} & \textbf{Unit} \\
+\midrule
+Acid consumption       & $+$24,750 & \$/yr per kg/t \\
+Throughput             & $+$16,002 & \$/yr per t/d \\
+Bond work index        & $+$15,840 & \$/yr per kWh/t \\
+Residence time         & $+$10,185 & \$/yr per hr \\
+Operating temperature  & $+$8,250  & \$/yr per \textdegree C \\
+\bottomrule
+\end{tabular}
+\end{frame}
+
+% ═══════════════════════════════════════════════════════════
+\section{Conclusions}
+% ═══════════════════════════════════════════════════════════
+
+\begin{frame}{Key Findings}
+
+\begin{enumerate}
+  \item BOF slag at 500 t/d produces \textbf{168 t/yr H\textsubscript{2}}, sequesters \textbf{37,884 t/yr CO\textsubscript{2}}, recovers \textbf{23,100 t/yr Fe}
+  \item Optimal topology (Config-4: minimal) yields net \textbf{$-$\$6.83/t} at current prices
+  \item \textbf{Acid consumption} is the dominant cost driver (74\% of OPEX)
+  \item Breakeven at CO\textsubscript{2} $\geq$\SI{90}{\$/t} or acid $\leq$\SI{100}{kg/t}
+  \item \textcolor{StepGreen}{Optimistic scenario: \textbf{+\$9.85/t} profit (\$1.63M/yr)}
+\end{enumerate}
+
+\vspace{12pt}
+\textbf{Next steps:}
+\begin{itemize}
+  \item Pilot-scale serpentinization trials
+  \item Acid regeneration feasibility study
+  \item Include V/Cr co-product economics
+\end{itemize}
+\end{frame}
+
+% === CLOSING ===
+\closingSlide
+
+\end{document}

@@ -30,7 +30,9 @@ optimize_superstructure_tool(
 )
 ```
 
-This enumerates all topologies, simulates each via IDAES, and optionally runs BoTorch on continuous parameters for the best topology.
+This enumerates all topologies, simulates each via the IDAES sequential-modular solver, and optionally runs BoTorch on continuous parameters for the best topology.
+
+> **Note**: Geo-reactor units (serpentinization, carbonation, heat exchangers, pumps) use **stoichiometric conversion and engineering models** built into the `IDAESFlowsheetBuilder`, not Reaktoro. Reaktoro is used only for REE aqueous equilibrium reactors (leach, precipitation). See `idaes_adapter.py` for the unit solver dispatch.
 
 ### Option B: Rigorous EO GDP Solver (for larger superstructures > 32 topologies)
 

@@ -210,8 +210,12 @@ def build_sub_flowsheet(
         if uid not in unit_map:
             continue
         orig = unit_map[uid]
+        # Only resolve INPUTS through the remap chain.
+        # Outputs are PRODUCED by this active unit, so they keep their
+        # original names — otherwise disjunction alternatives sharing
+        # the same I/O create self-loops.
         remapped_inputs = [resolve(s) for s in orig.inputs]
-        remapped_outputs = [resolve(s) for s in orig.outputs]
+        remapped_outputs = list(orig.outputs)
 
         # Apply stage_choice if applicable
         params = dict(orig.params)

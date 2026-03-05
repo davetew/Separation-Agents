@@ -1,0 +1,98 @@
+# Steel Slag (BOF) — Feed Characterization
+# Generated: 2026-03-05
+# Source: Basic Oxygen Furnace slag, typical composition
+# Throughput assumption: 500 t/d
+
+feed:
+  name: steel_slag_leachate
+  description: >
+    HCl acid leach of BOF steel slag. Composition based on typical
+    BOF slag (CaO 40%, FeO 20%, SiO₂ 15%, MgO 8%, Al₂O₃ 5%,
+    MnO 5%, Cr₂O₃ 2%, V₂O₅ 0.5%, P₂O₅ 1.5%, TiO₂ 0.5%).
+    Slag is dissolved at 100 g/L solid loading in 2M HCl.
+  phase: liquid
+  temperature_K: 298.15
+  pressure_Pa: 101325
+  pH: 1.09
+  composition_wt:
+    H2O(aq): 1000.0
+    Ca+2: 20.04     # 0.5 mol × 40.08 g/mol
+    Fe+2: 13.96     # 0.25 mol × 55.85
+    Mg+2: 3.40      # 0.14 mol × 24.31
+    Al+3: 1.89      # 0.07 mol × 26.98
+    Mn+2: 2.75      # 0.05 mol × 54.94
+    SiO2(aq): 10.81  # 0.18 mol × 60.08
+    HCl(aq): 65.66  # 1.8 mol × 36.46 (added acid)
+
+auxiliary_streams:
+  acid:
+    name: hcl_makeup
+    phase: liquid
+    composition_wt:
+      HCl(aq): 36.46   # 1 mol HCl per kg water
+      H2O(aq): 1000.0
+
+  co2_gas:
+    name: co2_feed
+    phase: gas
+    description: CO₂ for mineralization (flue gas or captured)
+    composition_wt:
+      CO2(aq): 44.01
+
+speciation:
+  pH: 1.09
+  Eh_V: 0.14
+  ionic_strength: 2.14
+  dominant_species:
+    - {species: "Cl-", mol: 1.24}
+    - {species: "Ca+2", mol: 0.25}
+    - {species: "CaCl+", mol: 0.16}
+    - {species: "Fe+2", mol: 0.13}
+    - {species: "FeCl+", mol: 0.12}
+    - {species: "SiO2(aq)", mol: 0.09}
+    - {species: "H4SiO4(aq)", mol: 0.09}
+    - {species: "Mg+2", mol: 0.07}
+    - {species: "Al+3", mol: 0.07}
+    - {species: "Mn+2", mol: 0.03}
+
+value_streams:
+  - name: iron_recovery
+    trigger: "Fe²⁺ = 0.25 mol (13.96 g/kg leachate)"
+    products: [magnetite_concentrate, Fe2O3]
+    price_usd_per_t: 120
+    recovery_est: 0.85
+
+  - name: co2_mineralization
+    trigger: "Ca²⁺ = 0.5 mol, Mg²⁺ = 0.14 mol — total alkalinity for carbonation"
+    products: [CaCO3, MgCO3, carbon_credits]
+    price_usd_per_t_co2: 60
+    co2_sequestered_kg_per_t_slag: 280
+
+  - name: h2_production
+    trigger: "Fe²⁺ + serpentinization conditions"
+    products: [H2_gas]
+    price_usd_per_kg: 4.0
+    h2_yield_kg_per_t_slag: 1.2
+
+  - name: mn_recovery
+    trigger: "Mn²⁺ = 0.05 mol (2.75 g/kg leachate)"
+    products: [MnO2, electrolytic_Mn]
+    price_usd_per_t: 2500
+    recovery_est: 0.70
+
+  - name: construction_aggregate
+    trigger: "Residual silicates/aluminates after metal extraction"
+    products: [aggregate, controlled_fill]
+    price_usd_per_t: 15
+
+  - name: v_cr_recovery
+    trigger: "V₂O₅ ~0.5%, Cr₂O₃ ~2% (not modeled in speciation)"
+    products: [ferrovanadium, ferrochrome]
+    price_usd_per_t_V2O5: 12000
+    price_usd_per_t_Cr: 8000
+    note: "Cr and V not in Reaktoro light_ree preset; estimated from bulk assay"
+
+throughput:
+  solid_feed_t_per_day: 500
+  leachate_L_per_t_slag: 10  # 100 g/L solid loading
+  operating_days_per_year: 330

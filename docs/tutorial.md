@@ -111,6 +111,21 @@ print(f"Bypassed units: {result.bypassed_units}")    # e.g., []
 print(f"Objective:      {result.objective_value}")   # e.g., -0.425
 ```
 
+### Enumerative GDP Solver
+
+For smaller superstructures, the enumerative solver in `gdp_solver.py` exhaustively evaluates all feasible topologies and ranks them by objective:
+
+```python
+from sep_agents.dsl.ree_superstructures import SUPERSTRUCTURE_REGISTRY
+from sep_agents.opt.gdp_solver import optimize_superstructure
+
+ss = SUPERSTRUCTURE_REGISTRY["steel_slag_valorization"]()
+result = optimize_superstructure(ss, database="light_ree")
+
+for ev in result.all_results:
+    print(f"{sorted(ev.config.active_unit_ids)} → obj={ev.objective_value:.4f}")
+```
+
 ### XOR Disjunctions (Choose-one alternatives)
 
 ```python
@@ -172,3 +187,117 @@ print(optim_result["optimal_parameters"])
 ```
 
 The optimizer generates Latin Hypercube designs, trains a SingleTaskGP surrogate, optimizes Log Expected Improvement, and returns the best flowsheet configuration.
+
+## 8. JAX Equilibrium Solver
+
+The JAX equilibrium solver (`jax_equilibrium.py`) is a pure-JAX implementation of constrained Gibbs energy minimization. It provides the same speciation outputs as Reaktoro but is fully differentiable via `jax.grad`:
+
+```python
+from sep_agents.sim.jax_equilibrium import build_jax_system, JaxEquilibriumSolver
+
+# Build a chemical system for light REEs
+system = build_jax_system(preset="light_ree", include_minerals=True)
+solver = JaxEquilibriumSolver(system)
+
+# Speciate at 250°C
+result = solver.speciate(
+    temperature_C=250.0,
+    pressure_atm=100.0,
+    water_kg=1.0,
+    ree_mol={"La": 0.01, "Ce": 0.01, "Nd": 0.01},
+    acid_mol={"HCl": 0.1},
+)
+
+print(f"pH = {result['pH']:.2f}")
+print(f"Eh = {result['Eh_V']:.3f} V")
+print(f"Species: {result['species_amounts']}")
+```
+
+### HKF-Based System
+
+For expanded databases with 1100+ species from SUPCRTBL:
+
+```python
+from sep_agents.sim.jax_equilibrium import build_jax_system_hkf
+
+system = build_jax_system_hkf(
+    preset="light_ree",
+    include_minerals=True,
+    include_gases=False,
+)
+solver = JaxEquilibriumSolver(system)
+```
+
+### Key Advantages
+
+| Feature | Reaktoro | JAX Solver |
+|---------|----------|------------|
+| Differentiable | No | Yes (`jax.grad`, `jax.jacfwd`) |
+| JIT-compilable | No | Yes (`jax.jit`) |
+| Custom EOS | Limited | HKF + Holland-Powell + Peng-Robinson |
+| GPU acceleration | No | Yes (via JAX backend) |
+
+## 9. JAX Differentiable Cost Analysis
+
+The JAX TEA module (`jax_tea.py`) provides fully differentiable cost functions for techno-economic analysis. All functions are pure JAX, enabling gradient-based sensitivity analysis via `jax.grad`:
+
+```python
+import jax.numpy as jnp
+from sep_agents.cost.jax_tea import (
+    total_annualized_cost,
+    cost_sensitivity,
+    itemized_cost,
+)
+
+params = {
+    "ore_throughput_tpd": jnp.array(500.0),
+    "strip_ratio": jnp.array(2.0),
+    "mine_depth_m": jnp.array(50.0),
+    "bond_work_index": jnp.array(15.0),
+    "residence_time_h": jnp.array(4.0),
+    "acid_consumption_kg_t": jnp.array(50.0),
+    "operating_temp_c": jnp.array(250.0),
+    "sx_stages": jnp.array(10.0),
+    "precipitation_reagent_tpy": jnp.array(500.0),
+    "aq_flow_m3_h": jnp.array(100.0),
+}
+
+# Compute total EAC
+eac = total_annualized_cost(params)
+print(f"EAC: ${float(eac):,.0f}/yr")
+
+# Compute itemized costs
+costs = itemized_cost(params)
+for k, v in costs.items():
+    print(f"  {k}: ${float(v):,.0f}")
+
+# Compute sensitivities: d(EAC)/d(param)
+grads = cost_sensitivity(params)
+for k, v in grads.items():
+    print(f"  d(EAC)/d({k}) = {float(v):,.2f}")
+```
+
+### Cost Function Hierarchy
+
+| Function | Returns | Differentiable |
+|----------|---------|---------------|
+| `mining_cost(params)` | (CAPEX, OPEX) | ✅ |
+| `comminution_cost(params)` | (CAPEX, OPEX) | ✅ |
+| `leaching_cost(params)` | (CAPEX, OPEX) | ✅ |
+| `processing_cost(params)` | (CAPEX, OPEX) | ✅ |
+| `itemized_cost(params)` | Dict of all components | ✅ |
+| `total_annualized_cost(params)` | Scalar EAC | ✅ |
+| `cost_sensitivity(params)` | Dict of ∂(EAC)/∂(param) | N/A (returns grads) |
+
+## 10. Agent Workflows
+
+The agent workflow system (`.agent/workflows/`) automates the full valorization pipeline. The top-level `/valorize` command chains six stages:
+
+1. **`/resource-characterization`** — Parse raw material, run equilibrium speciation, identify value streams, assign commodity prices
+2. **`/superstructure-selection`** — Query superstructure registry, enumerate topologies, construct new superstructures if needed
+3. **`/process-optimization`** — GDP topology optimization, IDAES simulation, BoTorch BO, JAX TEA sensitivity
+4. **`/cost-analysis`** — CAPEX/OPEX/EAC/revenue/net value reporting
+5. **`/valorization-report`** — LaTeX technical report with TikZ PFDs, tables, and equations
+6. **`/valorization-presentation`** — Branded Beamer slide deck using `sf-branding` + `lualatex`
+
+All Python commands run inside the `rkt` conda environment. User gates are inserted at key decision points (after characterization and superstructure selection) to allow review before proceeding.

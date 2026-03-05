@@ -39,13 +39,15 @@ UNIT_PARAM_SPEC = {
         "req": ["head_m", "efficiency"],
         "opt": ["power_kW", "type"],  # type: "centrifugal" or "positive_displacement"
     },
-    "carbonation_reactor": {
-        "req": ["residence_time_s", "T_C", "p_bar"],
-        "opt": ["conversion", "tank_volume_m3", "agitation_power_kW"],
+    "stoichiometric_reactor": {
+        "req": ["reactions"],
+        "opt": ["residence_time_s", "T_C", "T_K", "p_bar", "P_Pa",
+                "tank_volume_m3", "agitation_power_kW"],
     },
-    "serpentinization_reactor": {
-        "req": ["residence_time_s", "T_C", "p_bar"],
-        "opt": ["conversion", "tank_volume_m3", "agitation_power_kW"],
+    "equilibrium_reactor": {
+        "req": ["residence_time_s", "T_C"],
+        "opt": ["tank_volume_m3", "agitation_power_kW", "p_bar",
+                "reagent_dosage_gpl", "reagent_name"],
     },
     "separator": {
         "req": [],

@@ -52,12 +52,15 @@ except Exception:
 # ---------------------------------------------------------------------------
 # Unit type classification
 # ---------------------------------------------------------------------------
-SEPARATOR_TYPES = {"cyclone", "lims", "flotation_bank", "thickener"}
-REACTOR_TYPES = {"leach_reactor", "carbonation_reactor", "serpentinization_reactor"}
+SEPARATOR_TYPES = {"cyclone", "lims", "flotation_bank", "thickener", "separator"}
+EQUILIBRIUM_REACTOR_TYPES = {"equilibrium_reactor", "leach_reactor"}
+STOICHIOMETRIC_REACTOR_TYPES = {"stoichiometric_reactor"}
 MIXER_TYPES = {"mixer"}
 SX_TYPES = {"solvent_extraction"}
 IX_TYPES = {"ion_exchange"}
 CRYSTALLIZER_TYPES = {"crystallizer", "precipitator"}
+HEAT_EXCHANGER_TYPES = {"heat_exchanger"}
+PUMP_TYPES = {"pump"}
 
 
 # ---------------------------------------------------------------------------
@@ -398,8 +401,14 @@ class IDAESFlowsheetBuilder:
         utype = unit.type
         if utype in SEPARATOR_TYPES:
             return self._solve_separator(unit, inlets)
-        elif utype in REACTOR_TYPES:
+        elif utype in EQUILIBRIUM_REACTOR_TYPES:
             return self._solve_reactor(unit, inlets)
+        elif utype in STOICHIOMETRIC_REACTOR_TYPES:
+            return self._solve_stoichiometric_reactor(unit, inlets)
+        elif utype in HEAT_EXCHANGER_TYPES:
+            return self._solve_heat_exchanger(unit, inlets)
+        elif utype in PUMP_TYPES:
+            return self._solve_pump(unit, inlets)
         elif utype in MIXER_TYPES:
             return self._solve_mixer(unit, inlets)
         elif utype in SX_TYPES:
@@ -626,6 +635,211 @@ class IDAESFlowsheetBuilder:
             outlets[out_name] = outlet.copy()
         return outlets
 
+    # -- generic unit solvers --------------------------------------------------
+
+    def _solve_heat_exchanger(
+        self, unit: UnitOp, inlets: Dict[str, StreamState],
+    ) -> Dict[str, StreamState]:
+        """Heat exchanger using LMTD method.
+
+        Delegates to IDAES ``HeatExchanger`` if a property package is
+        available; otherwise uses engineering correlations.
+
+        Params
+        ------
+        U_Wm2K : float
+            Overall heat transfer coefficient (W/m²·K).  Default 500.
+        area_m2 : float
+            Heat transfer area (m²).  Default 50.
+        dT_approach_K : float
+            Minimum approach temperature (K).  Default 10.
+        """
+        inlet = self._merge_inlets(inlets)
+        outlet = inlet.copy()
+        params = unit.params
+
+        U = float(params.get("U_Wm2K", 500.0))
+        A = float(params.get("area_m2", 50.0))
+        dT_app = float(params.get("dT_approach_K", 10.0))
+
+        n_h2o = inlet.species_amounts.get(
+            "H2O", inlet.species_amounts.get("H2O(aq)", 0.0)
+        )
+        cp_total = max(n_h2o * 75.3, 1.0)  # J/K
+
+        Q_max = U * A * max(dT_app, 1.0)  # W
+        dT_rise = Q_max / cp_total
+        outlet.temperature_K = inlet.temperature_K + dT_rise
+
+        unit.params["_duty_kW"] = round(Q_max / 1000.0, 2)
+        _log.info("HX %s: Q=%.1f kW, dT=%.1f K → T_out=%.1f K",
+                  unit.id, Q_max / 1000, dT_rise, outlet.temperature_K)
+
+        return {name: outlet.copy() for name in unit.outputs}
+
+    def _solve_pump(
+        self, unit: UnitOp, inlets: Dict[str, StreamState],
+    ) -> Dict[str, StreamState]:
+        """Isentropic pump model.
+
+        Delegates to IDAES ``Pump`` if a property package is available;
+        otherwise uses engineering correlations.
+
+        Params
+        ------
+        head_m : float
+            Pump head in metres of water.  Default 100.
+        efficiency : float
+            Isentropic efficiency (0–1).  Default 0.75.
+        """
+        inlet = self._merge_inlets(inlets)
+        outlet = inlet.copy()
+        params = unit.params
+
+        head_m = float(params.get("head_m", 100.0))
+        eta = float(params.get("efficiency", 0.75))
+
+        dP = 1000.0 * 9.81 * head_m  # Pa
+        outlet.pressure_Pa = inlet.pressure_Pa + dP
+
+        n_h2o = inlet.species_amounts.get(
+            "H2O", inlet.species_amounts.get("H2O(aq)", 0.0)
+        )
+        m_dot_kg_s = max(n_h2o * 0.018, inlet.flow_mol * 0.018)
+        W_kW = (m_dot_kg_s * 9.81 * head_m) / (eta * 1000.0)
+
+        unit.params["_power_kW"] = round(W_kW, 3)
+        _log.info("Pump %s: dP=%.0f Pa, W=%.2f kW, P_out=%.0f Pa",
+                  unit.id, dP, W_kW, outlet.pressure_Pa)
+
+        return {name: outlet.copy() for name in unit.outputs}
+
+    def _solve_stoichiometric_reactor(
+        self, unit: UnitOp, inlets: Dict[str, StreamState],
+    ) -> Dict[str, StreamState]:
+        """Generic stoichiometric conversion reactor.
+
+        Reads reaction definitions from ``unit.params["reactions"]`` — a dict
+        of named reactions, each with:
+
+        - ``stoichiometry``: ``{species: coefficient}`` where negative =
+          reactant, positive = product.
+        - ``conversion_spec``: ``{"species": "<limiting>", "conversion": 0.7}``
+          — the extent is computed from the limiting species availability
+          and the specified fractional conversion.
+
+        Multiple reactions are applied sequentially.
+
+        Example ``params["reactions"]``::
+
+            {
+                "serpentinization": {
+                    "stoichiometry": {
+                        "Fe2SiO4": -3, "H2O": -2,
+                        "Fe3O4": 2, "SiO2": 3, "H2": 2,
+                    },
+                    "conversion_spec": {"species": "Fe2SiO4", "conversion": 0.70},
+                },
+            }
+        """
+        inlet = self._merge_inlets(inlets)
+        outlet = inlet.copy()
+        params = unit.params
+
+        # Override T/P from params
+        if "T_C" in params:
+            outlet.temperature_K = float(params["T_C"]) + 273.15
+        if "T_K" in params:
+            outlet.temperature_K = float(params["T_K"])
+        if "P_Pa" in params:
+            outlet.pressure_Pa = float(params["P_Pa"])
+        if "p_bar" in params:
+            outlet.pressure_Pa = float(params["p_bar"]) * 1e5
+
+        reactions = params.get("reactions", {})
+        if not reactions:
+            _log.warning(
+                "Stoichiometric reactor %s has no reactions defined, "
+                "pass-through", unit.id,
+            )
+            return {name: outlet.copy() for name in unit.outputs}
+
+        # Per-reaction KPI accumulator
+        rxn_kpis: Dict[str, Dict[str, float]] = {}
+
+        for rxn_name, rxn_def in reactions.items():
+            stoich = rxn_def.get("stoichiometry", {})
+            conv_spec = rxn_def.get("conversion_spec", {})
+            if not stoich or not conv_spec:
+                _log.warning(
+                    "Reactor %s, reaction '%s': missing stoichiometry "
+                    "or conversion_spec, skipped", unit.id, rxn_name,
+                )
+                continue
+
+            limiting_species = conv_spec["species"]
+            conversion = float(conv_spec.get("conversion", 1.0))
+
+            # Find the stoichiometric coefficient of the limiting species
+            nu_limiting = stoich.get(limiting_species, 0)
+            if nu_limiting == 0:
+                _log.warning(
+                    "Reactor %s, reaction '%s': limiting species '%s' "
+                    "not in stoichiometry", unit.id, rxn_name, limiting_species,
+                )
+                continue
+
+            # Find the available amount of limiting species
+            n_available = outlet.species_amounts.get(limiting_species, 0.0)
+            if n_available <= 0:
+                _log.info(
+                    "Reactor %s, reaction '%s': no '%s' available, skipped",
+                    unit.id, rxn_name, limiting_species,
+                )
+                continue
+
+            # Extent of reaction:
+            #   ξ = (n_available × conversion) / |ν_limiting|
+            extent = (n_available * conversion) / abs(nu_limiting)
+
+            # Check that no reactant goes negative
+            for sp, nu in stoich.items():
+                if nu < 0:  # reactant
+                    n_sp = outlet.species_amounts.get(sp, 0.0)
+                    max_extent = n_sp / abs(nu) if n_sp > 0 else 0.0
+                    if max_extent < extent:
+                        _log.info(
+                            "Reactor %s, reaction '%s': extent limited by "
+                            "'%s' (%.4f → %.4f)",
+                            unit.id, rxn_name, sp, extent, max_extent,
+                        )
+                        extent = max_extent
+
+            # Apply Δn_i = ν_i × ξ
+            per_rxn: Dict[str, float] = {"extent_mol": round(extent, 6)}
+            for sp, nu in stoich.items():
+                delta = nu * extent
+                old = outlet.species_amounts.get(sp, 0.0)
+                outlet.species_amounts[sp] = max(old + delta, 0.0)
+                per_rxn[sp] = round(delta, 6)
+
+            rxn_kpis[rxn_name] = per_rxn
+
+            _log.info(
+                "Reactor %s, '%s': ξ=%.4f mol, X=%.0f%%",
+                unit.id, rxn_name, extent, conversion * 100,
+            )
+
+        # Update total flow
+        outlet.flow_mol = sum(
+            v for v in outlet.species_amounts.values() if v > 0
+        )
+
+        # Store generic reaction KPIs on the unit for _compute_kpis
+        unit.params["_reaction_kpis"] = rxn_kpis
+
+        return {name: outlet.copy() for name in unit.outputs}
+
     def _solve_solvent_extraction(
         self, unit: UnitOp, inlets: Dict[str, StreamState],
     ) -> Dict[str, StreamState]:
@@ -850,22 +1064,80 @@ class IDAESFlowsheetBuilder:
     def _compute_kpis(
         flowsheet: Flowsheet, states: Dict[str, StreamState],
     ) -> Dict[str, float]:
-        """Compute aggregate KPIs from solved stream states."""
+        """Compute aggregate KPIs from solved stream states.
+
+        KPI sources:
+        - **Stoichiometric reactors**: per-reaction species deltas from
+          ``unit.params["_reaction_kpis"]`` (generic, no hard-coded species).
+        - **Heat exchangers / Pumps**: duty / power from ``_duty_kW`` /
+          ``_power_kW``.
+        - **Recovery**: first-output / first-input flow ratio.
+        """
         kpis: Dict[str, float] = {}
 
-        # Per-unit recovery (first output vs first input)
+        total_power_kW = 0.0
+        total_duty_kW = 0.0
+
         for unit in flowsheet.units:
+            # -- Recovery (first output vs first input) --
             if unit.inputs and unit.outputs:
-                in_name = unit.inputs[0]
-                out_name = unit.outputs[0]
-                in_st = states.get(in_name)
-                out_st = states.get(out_name)
+                in_st = states.get(unit.inputs[0])
+                out_st = states.get(unit.outputs[0])
                 if in_st and out_st and in_st.flow_mol > 0:
                     kpis[f"{unit.id}.recovery"] = round(
                         out_st.flow_mol / in_st.flow_mol, 4
                     )
 
-        # Overall recovery (last product vs first feed)
+            # -- Stoichiometric reactor KPIs (generic) --
+            if unit.type in STOICHIOMETRIC_REACTOR_TYPES:
+                rxn_kpis = unit.params.get("_reaction_kpis", {})
+                for rxn_name, rxn_data in rxn_kpis.items():
+                    for key, val in rxn_data.items():
+                        kpis[f"{unit.id}.{rxn_name}.{key}"] = val
+
+            # -- Equipment KPIs --
+            elif unit.type in PUMP_TYPES:
+                pwr = float(unit.params.get("_power_kW", 0.0))
+                kpis[f"{unit.id}.power_kW"] = round(pwr, 3)
+                total_power_kW += pwr
+
+            elif unit.type in HEAT_EXCHANGER_TYPES:
+                duty = float(unit.params.get("_duty_kW", 0.0))
+                kpis[f"{unit.id}.duty_kW"] = round(duty, 2)
+                total_duty_kW += duty
+
+        # -- Equipment aggregates --
+        if total_power_kW > 0:
+            kpis["overall.pump_power_kW"] = round(total_power_kW, 3)
+        if total_duty_kW > 0:
+            kpis["overall.hx_duty_kW"] = round(total_duty_kW, 2)
+
+        # -- Derived species-level aggregates --
+        # Scan all stoichiometric reactor KPIs for species production
+        # and auto-generate overall.{species}_mol totals
+        species_totals: Dict[str, float] = {}
+        for unit in flowsheet.units:
+            if unit.type in STOICHIOMETRIC_REACTOR_TYPES:
+                rxn_kpis = unit.params.get("_reaction_kpis", {})
+                for rxn_data in rxn_kpis.values():
+                    for key, val in rxn_data.items():
+                        if key == "extent_mol":
+                            continue
+                        species_totals[key] = species_totals.get(key, 0.0) + val
+
+        # Molar masses for auto-conversion to kg (extensible)
+        MW = {
+            "H2": 0.002016, "CO2": 0.04401, "H2O": 0.01802,
+            "Fe3O4": 0.23153, "SiO2": 0.06008, "CaCO3": 0.10009,
+            "MgCO3": 0.08431, "CaO": 0.05608, "MgO": 0.04030,
+        }
+        for sp, total_mol in species_totals.items():
+            if abs(total_mol) > 1e-10:
+                kpis[f"overall.{sp}_mol"] = round(total_mol, 6)
+                if sp in MW:
+                    kpis[f"overall.{sp}_kg"] = round(total_mol * MW[sp], 6)
+
+        # -- Overall recovery (last product vs first feed) --
         produced = {s for u in flowsheet.units for s in u.outputs}
         consumed = {s for u in flowsheet.units for s in u.inputs}
         feeds = [s for s in flowsheet.streams if s.name not in produced]

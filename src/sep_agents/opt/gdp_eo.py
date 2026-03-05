@@ -51,6 +51,7 @@ from ..properties.ree_eo_properties import REEEOParameterBlock, _MOLAR_MASS
 from ..units.sx_eo import build_sx_stage, build_sx_cascade
 from ..units.precipitator_eo import build_precipitator
 from ..units.ix_eo import build_ix_column
+from ..sim.jax_pyomo_bridge import build_jax_reactor
 
 _log = logging.getLogger(__name__)
 
@@ -58,6 +59,8 @@ _log = logging.getLogger(__name__)
 SX_TYPES = {"solvent_extraction", "sx"}
 IX_TYPES = {"ion_exchange", "ix"}
 PRECIPITATOR_TYPES = {"precipitator", "crystallizer"}
+REACTOR_TYPES = {"reactor", "jax_reactor", "leach_reactor",
+                 "serpentinization_reactor", "carbonation_reactor"}
 AQUEOUS_BACKGROUND = {"H2O", "HCl", "NaOH", "H2C2O4"}
 REE_SYMBOLS = {"La", "Ce", "Pr", "Nd", "Sm", "Y", "Dy"}
 
@@ -239,6 +242,22 @@ class GDPEOBuilder:
             return build_ix_column(m, f"u_{unit.id}", comp_list,
                                     ree_components=ree_in, K_init=S_param)
 
+        elif utype in REACTOR_TYPES:
+            # JAX-backed equilibrium reactor with differentiable gradients
+            T_init = float(params.get("temperature_K", 298.15))
+            P_init = float(params.get("pressure_Pa", 101325.0))
+            preset = params.get("preset", "light_ree")
+            fix_T = params.get("fix_temperature", False)
+            fix_P = params.get("fix_pressure", True)
+            return build_jax_reactor(
+                m, f"u_{unit.id}", comp_list,
+                preset=preset,
+                temperature_init=T_init,
+                pressure_init=P_init,
+                fix_temperature=fix_T,
+                fix_pressure=fix_P,
+            )
+
         else:
             # Passthrough block — output mirrors input via constraints
             blk = Block(concrete=True)
@@ -338,6 +357,8 @@ class GDPEOBuilder:
             return ["solid", "barren"]
         elif utype in IX_TYPES:
             return ["loaded", "eluate"]
+        elif utype in REACTOR_TYPES:
+            return ["product"]
         else:
             return ["organic"]
 

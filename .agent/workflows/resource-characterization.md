@@ -28,9 +28,11 @@ Convert the mineralogy to an **aqueous-species basis** suitable for Reaktoro. Ma
 
 ---
 
-## Step 2: Equilibrium Speciation
+## Step 2: Equilibrium Speciation (Initial Characterization)
 
 Run thermodynamic speciation to determine the baseline aqueous chemistry of the feed.
+
+> **Note**: This speciation step is for **initial feed characterization only**. It establishes pH, Eh, and species distribution at ambient conditions. Process simulation (reaction kinetics, stoichiometric conversion in reactors) is performed separately by the IDAES sequential-modular framework using stoichiometric or equilibrium reactor models — **not** by Reaktoro.
 
 Use the `speciate_ree_stream` or `run_speciation` MCP tool:
 ```

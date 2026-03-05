@@ -1,0 +1,475 @@
+\documentclass[aspectratio=169]{beamer}
+
+% --- Step Function Branding (replaces any generic Beamer theme) ---
+% DO NOT use \usetheme{...}; sf-branding handles all theming.
+\usepackage{sf-branding}
+
+% --- Additional Packages ---
+\usepackage{appendixnumberbeamer}
+\usepackage{amsmath,amssymb}
+\usepackage{siunitx}
+\sisetup{group-separator={,}, group-minimum-digits=4}
+\usepackage{graphicx}
+\usepackage{booktabs}
+
+% --- Project-specific colors (data viz only) ---
+\definecolor{revenue}{HTML}{2E7D32}
+\definecolor{cost}{HTML}{C62828}
+
+\title{Techno-Economic Assessment of\\[4pt] \textbf{Steel Slag} Valorization}
+\subtitle{H\textsubscript{2} Production $\cdot$ CO\textsubscript{2} Sequestration $\cdot$ Iron Recovery}
+\author{Step Function LLC}
+\date{\today}
+
+\begin{document}
+
+% ═══════════════════════════════════════════════════════════════
+\begin{frame}
+\titlepage
+\end{frame}
+
+% ═══════════════════════════════════════════════════════════════
+\begin{frame}{Outline}
+\tableofcontents
+\end{frame}
+
+% ═══════════════════════════════════════════════════════════════
+\section{Background \& Opportunity}
+% ═══════════════════════════════════════════════════════════════
+
+\begin{frame}{Opportunity: BOF Steel Slag}
+\framesub{High-volume industrial byproduct with untapped value}
+\begin{columns}
+\column{0.55\textwidth}
+\begin{itemize}
+    \item \textbf{250+ Mt/yr} slag produced globally
+    \item Mostly landfilled — environmental liability
+    \item Rich in CaO, FeO/Fe\textsubscript{2}O\textsubscript{3}, MgO, SiO\textsubscript{2}
+\end{itemize}
+\vspace{8pt}
+\textbf{Three valorization pathways:}
+\begin{enumerate}
+    \item Green H\textsubscript{2} (serpentinization)
+    \item CO\textsubscript{2} sequestration (carbonation)
+    \item Iron concentrate (magnetic sep.)
+\end{enumerate}
+
+\column{0.42\textwidth}
+\begin{table}
+\centering
+\small
+\begin{tabular}{@{}lS[table-format=2.0]@{}}
+\toprule
+\textbf{\textcolor{white}{Component}} & \textbf{\textcolor{white}{wt\%}} \\
+\midrule
+\textcolor{white}{CaO}                & 40 \\
+\textcolor{white}{Fe\textsubscript{2}O\textsubscript{3}} & 15 \\
+\textcolor{white}{FeO}                & 15 \\
+\textcolor{white}{SiO\textsubscript{2}} & 20 \\
+\textcolor{white}{MgO}                & 10 \\
+\bottomrule
+\end{tabular}
+\end{table}
+\end{columns}
+\end{frame}
+
+% ═══════════════════════════════════════════════════════════════
+\begin{frame}{Resource Value Proposition}
+\framesub{A circular-economy approach to industrial waste}
+\begin{itemize}
+    \item \textbf{Environmental}: Avoids landfill; sequesters CO\textsubscript{2} in stable mineral carbonates
+    \item \textbf{Economic}: Three revenue streams from a zero-cost feedstock
+    \item \textbf{Strategic}: Green H\textsubscript{2} production at industrial scale
+\end{itemize}
+\vspace{12pt}
+\centering
+\begin{tabular}{@{}lll@{}}
+\toprule
+\textbf{\textcolor{white}{Pathway}} & \textbf{\textcolor{white}{Product}} & \textbf{\textcolor{white}{Market Value}} \\
+\midrule
+Magnetic separation & Fe concentrate & \SI{120}{\$/t} \\
+Mineral carbonation & CaCO\textsubscript{3} + CO\textsubscript{2} credits & \SI{60}{\$/t_{CO_2}} \\
+Serpentinization    & Green H\textsubscript{2} & \SI{4000}{\$/t} \\
+\bottomrule
+\end{tabular}
+\end{frame}
+
+% ═══════════════════════════════════════════════════════════════
+\section{Process Design}
+% ═══════════════════════════════════════════════════════════════
+
+\begin{frame}{Process Flow Diagram}
+\framesub{Optimal topology: heat recovery only (no aux heater, no scrubber)}
+\begin{center}
+\begin{tikzpicture}[
+  scale=0.82, every node/.append style={transform shape},
+  node distance=0.8cm and 1.3cm,
+  unit/.style={rectangle, draw=StepGrey, rounded corners=3pt, minimum width=1.6cm,
+               minimum height=0.60cm, align=center, fill=StepElectric!15,
+               font=\scriptsize, text=white},
+  product/.style={rectangle, draw=StepGrey, rounded corners=3pt, minimum width=1.4cm,
+                  minimum height=0.50cm, align=center, fill=StepGreen!15,
+                  font=\scriptsize\itshape, text=white},
+  feed/.style={rectangle, draw=StepGrey, rounded corners=3pt, minimum width=1.4cm,
+               minimum height=0.50cm, align=center, fill=StepOrange!15,
+               font=\scriptsize\itshape, text=white},
+  stream/.style={-{Stealth[length=2mm]}, semithick, white},
+]
+
+\node[feed] (slag) {Slag\\(\SI{500}{t/d})};
+\node[unit, right=of slag] (lims) {LIMS};
+\node[product, above=0.5cm of lims] (fe) {Fe Conc.};
+\node[unit, right=of lims] (pump1) {P-101};
+\node[unit, right=of pump1] (hx1) {E-101};
+\node[unit, right=of hx1] (serp) {R-101\\(\SI{250}{\degreeCelsius})};
+\node[unit, below=0.7cm of serp] (sep) {S-101};
+\node[product, right=of sep] (h2) {H\textsubscript{2}};
+
+\node[feed, below=1.5cm of pump1] (co2) {CO\textsubscript{2}};
+\node[unit, right=of co2] (hx2) {E-102};
+\node[unit, right=of hx2] (carb) {R-201\\(\SI{185}{\degreeCelsius})};
+\node[unit, below=0.7cm of carb] (thick) {S-201};
+\node[product, right=of thick] (caco3) {CaCO\textsubscript{3}};
+
+\draw[stream] (slag) -- (lims);
+\draw[stream] (lims) -- (fe);
+\draw[stream] (lims) -- (pump1);
+\draw[stream] (pump1) -- (hx1);
+\draw[stream] (hx1) -- (serp);
+\draw[stream] (serp) -- (sep);
+\draw[stream] (sep) -- (h2);
+\draw[stream] (sep.south) -- ++(0,-0.3) -| (hx2);
+\draw[stream] (co2) -- (hx2);
+\draw[stream] (hx2) -- (carb);
+\draw[stream] (carb) -- (thick);
+\draw[stream] (thick) -- (caco3);
+
+\draw[-{Stealth}, dashed, StepTeal!60] (serp.south west) to[bend right=25]
+    node[left, font=\tiny, StepTeal]{heat} (hx1.south);
+\draw[-{Stealth}, dashed, StepTeal!60] (carb.south west) to[bend right=25]
+    node[left, font=\tiny, StepTeal]{heat} (hx2.south);
+
+\end{tikzpicture}
+\end{center}
+\vspace{4pt}
+\small
+\textbf{Key insight}: Iron removal before carbonation raises pH for carbonate stability (Reaktoro-confirmed).
+\end{frame}
+
+% ═══════════════════════════════════════════════════════════════
+\begin{frame}{Key Reactions}
+\framesub{Two complementary conversion pathways}
+\begin{block}{Serpentinization (H\textsubscript{2} Production)}
+\vspace{-6pt}
+\begin{equation*}
+    \text{Fe}_2\text{SiO}_4 + 3\,\text{H}_2\text{O}
+    \xrightarrow{250\,^\circ\text{C},\;100\,\text{bar}}
+    2\,\text{Fe(OH)}_2 + \text{SiO}_2 + \text{H}_2
+\end{equation*}
+\end{block}
+\vspace{4pt}
+\begin{block}{Mineral Carbonation (CO\textsubscript{2} Sequestration)}
+\vspace{-6pt}
+\begin{align*}
+    \text{CaO} + \text{CO}_2 &\xrightarrow{\SI{185}{\degreeCelsius},\;\SI{50}{bar}} \text{CaCO}_3 \\
+    \text{MgO} + \text{CO}_2 &\longrightarrow \text{MgCO}_3
+\end{align*}
+\end{block}
+\end{frame}
+
+% ═══════════════════════════════════════════════════════════════
+\begin{frame}{Thermodynamic Speciation}
+\framesub{Reaktoro equilibrium confirms iron removal is essential before carbonation}
+\begin{table}
+\centering
+\small
+\begin{tabular}{@{}lccp{5cm}@{}}
+\toprule
+\textbf{\textcolor{white}{Scenario}} & \textbf{\textcolor{white}{pH}} & \textbf{\textcolor{white}{$E_h$}} & \textbf{\textcolor{white}{Key Finding}} \\
+\midrule
+\textcolor{white}{Ambient (\SI{25}{\degreeCelsius})} & \textcolor{white}{2.43} & \textcolor{white}{0.656} & \textcolor{StepGrey}{Fe$^{3+}$ hydrolysis; highly acidic} \\
+\textcolor{white}{Serpent. (\SI{250}{\degreeCelsius})} & \textcolor{white}{5.60} & \textcolor{white}{0.661} & \textcolor{StepGrey}{H$_2$(aq) produced; 0.7\% eq.\ conv.} \\
+\textcolor{white}{Carbonation (+CO$_2$)} & \textcolor{white}{3.20} & \textcolor{white}{0.106} & \textcolor{StepGrey}{$<$0.1\% CO$_2$ conv.\ at low pH} \\
+\bottomrule
+\end{tabular}
+\end{table}
+\vspace{10pt}
+\centering
+\textcolor{StepYellow}{\textbf{Critical}}: Dissolved Fe$^{3+}$ suppresses pH to $\sim$2--3, preventing carbonate precipitation.\\
+Iron removal must precede carbonation.
+\end{frame}
+
+% ═══════════════════════════════════════════════════════════════
+\begin{frame}{Modeling Methodology}
+\framesub{Three-tier computational hierarchy}
+\begin{columns}
+\column{0.55\textwidth}
+\begin{enumerate}
+    \item \textbf{Reaktoro} speciation
+    \begin{itemize}
+        \item Gibbs energy minimization
+        \item Confirms phase stability \& pH
+    \end{itemize}
+    \item \textbf{IDAES/GDP} superstructure
+    \begin{itemize}
+        \item Process synthesis \& screening
+        \item Topology enumeration
+    \end{itemize}
+    \item \textbf{JAX} techno-economics
+    \begin{itemize}
+        \item Differentiable cost model
+        \item Autodiff sensitivity analysis
+    \end{itemize}
+\end{enumerate}
+
+\column{0.42\textwidth}
+\centering
+\begin{tikzpicture}[
+  box/.style={rectangle, draw=StepGrey, rounded corners=3pt, minimum width=2.8cm,
+              minimum height=0.6cm, align=center, font=\scriptsize, text=white},
+  arr/.style={-{Stealth[length=2mm]}, semithick, white},
+]
+\node[box, fill=StepElectric!15] (rkt) {Reaktoro\\Speciation};
+\node[box, fill=StepTeal!15, below=0.6cm of rkt] (idaes) {IDAES/GDP\\Process Synthesis};
+\node[box, fill=StepGreen!15, below=0.6cm of idaes] (jax) {JAX TEA\\Cost \& Sensitivity};
+\draw[arr] (rkt) -- (idaes);
+\draw[arr] (idaes) -- (jax);
+\end{tikzpicture}
+\end{columns}
+\end{frame}
+
+% ═══════════════════════════════════════════════════════════════
+\section{GDP Analysis}
+% ═══════════════════════════════════════════════════════════════
+
+\begin{frame}{Superstructure Overview}
+\framesub{Generalized Disjunctive Programming for topology screening}
+\begin{columns}
+\column{0.55\textwidth}
+\begin{itemize}
+    \item \textbf{15 unit operations} (12 fixed, 3 optional)
+    \item \textbf{1 disjunction}: Aux heater \texttt{XOR} Heat recovery only
+    \item \textbf{1 optional}: Inter-reactor scrubber
+    \item \textbf{4 feasible topologies}
+    \item \textbf{12 continuous} design variables for BoTorch
+\end{itemize}
+
+\column{0.42\textwidth}
+\small
+\begin{table}
+\centering
+\begin{tabular}{@{}cc@{}}
+\toprule
+\textbf{\textcolor{white}{Heater}} & \textbf{\textcolor{white}{Scrubber}} \\
+\midrule
+\textcolor{StepGreen}{\checkmark} & \textcolor{StepGreen}{\checkmark} \\
+\textcolor{StepGreen}{\checkmark} & \textcolor{StepGrey}{---} \\
+\textcolor{StepGrey}{---} & \textcolor{StepGreen}{\checkmark} \\
+\textcolor{StepGrey}{---} & \textcolor{StepGrey}{---} \\
+\bottomrule
+\end{tabular}
+\end{table}
+\centering
+\textcolor{StepGrey}{\small 4 topologies (2$\times$2)}
+\end{columns}
+\end{frame}
+
+% ═══════════════════════════════════════════════════════════════
+\begin{frame}{Topology Ranking}
+\framesub{Heat recovery only is the clear winner}
+\begin{table}
+\centering
+\small
+\begin{tabular}{@{}clccccc@{}}
+\toprule
+\textbf{\textcolor{white}{Rank}} & \textbf{\textcolor{white}{Topology}} & \textbf{\textcolor{white}{CAPEX}}
+  & \textbf{\textcolor{white}{OPEX}} & \textbf{\textcolor{white}{EAC}}
+  & \textbf{\textcolor{white}{Revenue}} & \textbf{\textcolor{white}{Net}} \\
+& & \textcolor{StepGrey}{(\$M)} & \textcolor{StepGrey}{(\$M/yr)} & \textcolor{StepGrey}{(\$M/yr)}
+  & \textcolor{StepGrey}{(\$M/yr)} & \textcolor{StepGrey}{(\$M/yr)} \\
+\midrule
+\textbf{\textcolor{StepTeal}{1}} & \textbf{\textcolor{StepTeal}{HR only}} & \textbf{7.76} & \textbf{2.49} & \textbf{3.28}
+  & \textbf{9.53} & \textcolor{StepGreen}{\textbf{6.25}} \\
+2 & HR + scrubber & 7.96 & 2.49 & 3.30 & 9.53 & 6.23 \\
+3 & Aux heater    & 8.06 & 3.07 & 3.89 & 9.53 & 5.64 \\
+4 & Aux + scrub   & 8.26 & 3.07 & 3.91 & 9.53 & 5.62 \\
+\bottomrule
+\end{tabular}
+\end{table}
+\vspace{6pt}
+\centering
+\small Aux heater adds \SI{0.58}{M\$/yr} OPEX with no measurable benefit.
+\end{frame}
+
+% ═══════════════════════════════════════════════════════════════
+\begin{frame}{Optimal Topology}
+\framesub{Heat recovery eliminates auxiliary heater capital and energy cost}
+\begin{itemize}
+    \item \textbf{Selected}: Heat recovery only — no aux heater, no scrubber
+    \item \textbf{CAPEX}: \$\num{7760000} (lowest)
+    \item \textbf{EAC}: \$\num{3280000}/yr (lowest)
+    \item \textbf{Net annual value}: \textcolor{StepGreen}{\textbf{\$\num{6250000}/yr}} (highest)
+\end{itemize}
+\vspace{12pt}
+\textbf{Key differentiators:}
+\begin{itemize}
+    \item Exothermic serpentinization/carbonation reactions supply heat to exchangers
+    \item Scrubber adds \$\num{200000} CAPEX with negligible impact on purity
+    \item Simpler flowsheet reduces maintenance and downtime risk
+\end{itemize}
+\end{frame}
+
+% ═══════════════════════════════════════════════════════════════
+\section{Results}
+% ═══════════════════════════════════════════════════════════════
+
+\begin{frame}{Simulation KPIs}
+\framesub{Recoveries and conversions from IDAES simulation}
+\begin{table}
+\centering
+\begin{tabular}{@{}lr@{}}
+\toprule
+\textbf{\textcolor{white}{Metric}} & \textbf{\textcolor{white}{Value}} \\
+\midrule
+Fe recovery (LIMS) & \SI{85}{\percent} \\
+H\textsubscript{2} production & \SI{241}{t/yr} \\
+CO\textsubscript{2} sequestered & \num{58575}~t/yr \\
+CaCO\textsubscript{3} produced & \num{104598}~t/yr \\
+Feedstock throughput & \SI{500}{t/d} $\times$ \SI{330}{d/yr} \\
+\bottomrule
+\end{tabular}
+\end{table}
+\end{frame}
+
+% ═══════════════════════════════════════════════════════════════
+\begin{frame}{Net Value}
+\centering
+\vspace{2cm}
+{\Huge\textbf{\textcolor{StepGreen}{\$37.87/t}}}\\[12pt]
+{\large Net value per tonne of steel slag}\\[8pt]
+{\normalsize
+\textcolor{StepGreen}{Revenue: \$57.73/t} \quad
+\textcolor{StepRed}{Cost: \$19.88/t}}\\[6pt]
+{\small\textcolor{StepGrey}{\SI{500}{t/d} $\cdot$ \SI{330}{d/yr} $\cdot$ 20-yr project $\cdot$ 8\% discount}}
+\end{frame}
+
+% ═══════════════════════════════════════════════════════════════
+\begin{frame}{Revenue Breakdown}
+\framesub{Iron concentrate is the dominant value driver}
+\begin{table}
+\centering
+\begin{tabular}{@{}lrrc@{}}
+\toprule
+\textbf{\textcolor{white}{Product}} & \textbf{\textcolor{white}{Production}} & \textbf{\textcolor{white}{Revenue}} & \textbf{\textcolor{white}{Share}} \\
+\midrule
+Fe concentrate & \num{42075}~t/yr & \textcolor{StepGreen}{\$5.05M/yr} & 53\% \\
+CO\textsubscript{2} credits & \num{58575}~t/yr & \textcolor{StepGreen}{\$3.51M/yr} & 37\% \\
+H\textsubscript{2} gas & \SI{241}{t/yr} & \textcolor{StepGreen}{\$0.96M/yr} & 10\% \\
+\midrule
+\textbf{Total} & & \textcolor{StepGreen}{\textbf{\$9.53M/yr}} & 100\% \\
+\bottomrule
+\end{tabular}
+\end{table}
+\vspace{10pt}
+\centering
+\small Iron concentrate is the dominant value driver at 53\% of total revenue.
+\end{frame}
+
+% ═══════════════════════════════════════════════════════════════
+\begin{frame}{Economics Summary}
+\framesub{Annual cost vs.\ revenue breakdown}
+\begin{table}
+\centering
+\begin{tabular}{@{}lr@{}}
+\toprule
+\textbf{\textcolor{white}{Item}} & \textbf{\textcolor{white}{Value}} \\
+\midrule
+\textcolor{StepRed}{CAPEX (installed)} & \$\num{7760000} \\
+\textcolor{StepRed}{OPEX (annual)} & \$\num{2490000}/yr \\
+\textcolor{StepRed}{EAC (annualized total)} & \$\num{3280000}/yr \\
+\midrule
+\textcolor{StepGreen}{Revenue (annual)} & \$\num{9530000}/yr \\
+\textcolor{StepGreen}{\textbf{Net annual value}} & \textbf{\$\num{6250000}/yr} \\
+\bottomrule
+\end{tabular}
+\end{table}
+\vspace{8pt}
+\centering
+\small Payback period: $<$ 2~years at full capacity.
+\end{frame}
+
+% ═══════════════════════════════════════════════════════════════
+\section{Optimization \& Sensitivity}
+% ═══════════════════════════════════════════════════════════════
+
+\begin{frame}{BoTorch Optimization Results}
+\framesub{Bayesian optimization over 12 continuous parameters}
+\begin{table}
+\centering
+\begin{tabular}{@{}lcc@{}}
+\toprule
+\textbf{\textcolor{white}{Metric}} & \textbf{\textcolor{white}{Baseline}} & \textbf{\textcolor{white}{Optimized}} \\
+\midrule
+OPEX (\$/yr) & \num{2490000} & \num{2350000} \\
+EAC (\$/yr)  & \num{3280000} & \num{3140000} \\
+Net (\$/yr)  & \num{6250000} & \textcolor{StepGreen}{\textbf{\num{6390000}}} \\
+\midrule
+\textbf{Improvement} & & \textcolor{StepGreen}{+\SI{2.2}{\percent}} \\
+\bottomrule
+\end{tabular}
+\end{table}
+\vspace{8pt}
+\centering
+\small 15 BO iterations converged; optimal point reduces energy consumption via lower residence time.
+\end{frame}
+
+% ═══════════════════════════════════════════════════════════════
+\begin{frame}{Cost Sensitivity (JAX Autodiff)}
+\framesub{Top cost drivers identified via automatic differentiation}
+\begin{table}
+\centering
+\begin{tabular}{@{}lrl@{}}
+\toprule
+\textbf{\textcolor{white}{Parameter}} & \textbf{\textcolor{white}{$|\partial\text{EAC}/\partial x|$}} & \textbf{\textcolor{white}{Interpretation}} \\
+\midrule
+Residence time & \SI{10185}{\$/h}  & Reactor sizing driver \\
+Operating temp & \SI{8250}{\$/\degreeCelsius} & Energy cost driver \\
+Throughput     & \SI{5214}{\$/(t/d)} & Economies of scale \\
+\bottomrule
+\end{tabular}
+\end{table}
+\vspace{10pt}
+\textbf{Key risks:}
+\begin{itemize}
+    \item CO\textsubscript{2} credits at \SI{30}{\$/t} $\to$ net value drops to \$27.22/t
+    \item Fe price at \SI{80}{\$/t} $\to$ revenue loss of \$1.68M/yr
+    \item Serpentinization kinetics require catalyst R\&D
+\end{itemize}
+\end{frame}
+
+% ═══════════════════════════════════════════════════════════════
+\section{Conclusions}
+% ═══════════════════════════════════════════════════════════════
+
+\begin{frame}{Key Findings}
+\begin{enumerate}
+    \item Steel slag valorization at \SI{500}{t/d} yields \textcolor{StepGreen}{\textbf{\$37.87/t}} net value
+    \item Optimal topology: \textbf{heat recovery only} (no auxiliary heater, no scrubber)
+    \item \textbf{Iron concentrate} is the dominant revenue driver (53\%)
+    \item \textbf{Iron removal before carbonation} is thermodynamically essential
+    \item Aux heater \& scrubber do not justify added cost
+\end{enumerate}
+\vspace{12pt}
+\textbf{Next steps:}
+\begin{itemize}
+    \item Pilot-scale serpentinization kinetics testing
+    \item Detailed vendor quotes for high-pressure reactor vessels
+    \item Include Cr/Mn/V value streams (requires expanded thermodynamic database)
+\end{itemize}
+\end{frame}
+
+% ═══════════════════════════════════════════════════════════════
+% Branded closing slide
+\closingSlide
+
+\end{document}

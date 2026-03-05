@@ -39,6 +39,7 @@ from ..properties.ree_eo_properties import REEEOParameterBlock
 from ..units.sx_eo import build_sx_stage, build_sx_cascade
 from ..units.precipitator_eo import build_precipitator
 from ..units.ix_eo import build_ix_column
+from ..sim.jax_pyomo_bridge import build_jax_reactor
 
 _log = logging.getLogger(__name__)
 
@@ -49,9 +50,10 @@ PRECIPITATOR_TYPES = {"precipitator", "crystallizer"}
 PASSTHROUGH_TYPES = {"mixer", "mill", "separator", "magnetic_separator",
                      "flotation", "leach", "filter"}
 
-# Geological process units — pass-through in EO until full Pyomo models exist
-GEO_REACTOR_TYPES = {"serpentinization_reactor", "carbonation_reactor",
-                     "leach_reactor"}
+# Reactor types backed by JAX equilibrium solver
+REACTOR_TYPES = {"reactor", "jax_reactor", "leach_reactor",
+                 "serpentinization_reactor", "carbonation_reactor"}
+# Equipment types — pass-through until full Pyomo models exist
 GEO_EQUIPMENT_TYPES = {"heat_exchanger", "pump"}
 
 # Background species that stay in aqueous phase during SX
@@ -223,7 +225,24 @@ class EOFlowsheetBuilder:
 
             return blk
 
-        elif utype in PASSTHROUGH_TYPES | GEO_REACTOR_TYPES | GEO_EQUIPMENT_TYPES:
+        elif utype in REACTOR_TYPES:
+            # JAX-backed equilibrium reactor with differentiable gradients
+            params_r = unit.params or {}
+            T_init = float(params_r.get("temperature_K", 298.15))
+            P_init = float(params_r.get("pressure_Pa", 101325.0))
+            preset = params_r.get("preset", "light_ree")
+            fix_T = params_r.get("fix_temperature", True)  # simulation mode default
+            fix_P = params_r.get("fix_pressure", True)
+            return build_jax_reactor(
+                m, f"u_{unit.id}", comp_list,
+                preset=preset,
+                temperature_init=T_init,
+                pressure_init=P_init,
+                fix_temperature=fix_T,
+                fix_pressure=fix_P,
+            )
+
+        elif utype in PASSTHROUGH_TYPES | GEO_EQUIPMENT_TYPES:
             # Simple pass-through: create trivial block with feed = output
             return self._build_passthrough(m, unit, comp_list)
 
@@ -303,6 +322,8 @@ class EOFlowsheetBuilder:
                     port = "solid" if i == 0 else "barren"
                 elif u.type in IX_TYPES:
                     port = "loaded" if i == 0 else "eluate"
+                elif u.type in REACTOR_TYPES:
+                    port = "product"
                 output_map[out_name] = (u.id, port)
 
         # Build input → unit map
@@ -401,12 +422,24 @@ class EOFlowsheetBuilder:
         _old_tmpdir = _os.environ.get("TMPDIR")
         _os.environ["TMPDIR"] = _tf.gettempdir()
         try:
-            result = solver.solve(m, tee=False)
+            # keepfiles=True prevents IPOPT ASL SIGSEGV (return code -11)
+            # when Python ExternalFunction callbacks are used across
+            # multiple solves in the same process.
+            result = solver.solve(m, tee=False, keepfiles=True,
+                                  load_solutions=True)
         finally:
             if _old_tmpdir is None:
                 _os.environ.pop("TMPDIR", None)
             else:
                 _os.environ["TMPDIR"] = _old_tmpdir
+            # Clean up keepfiles artefacts
+            import glob as _glob
+            for f in _glob.glob(_os.path.join(_tf.gettempdir(), "tmp*.*")):
+                try:
+                    if f.endswith((".nl", ".sol", ".log")):
+                        _os.remove(f)
+                except OSError:
+                    pass
 
         if result.solver.termination_condition not in (
             TerminationCondition.optimal,
@@ -449,6 +482,9 @@ class EOFlowsheetBuilder:
                     port_map[unit.outputs[0]] = "loaded"
                 if len(unit.outputs) >= 2:
                     port_map[unit.outputs[1]] = "eluate"
+            elif unit.type in REACTOR_TYPES:
+                if len(unit.outputs) >= 1:
+                    port_map[unit.outputs[0]] = "product"
             else:
                 if len(unit.outputs) >= 1:
                     port_map[unit.outputs[0]] = "organic"

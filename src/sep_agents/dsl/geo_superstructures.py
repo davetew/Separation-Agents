@@ -135,31 +135,61 @@ def steel_slag_h2_co2_superstructure() -> Superstructure:
         # Reactors — Series configuration (both active)
         # ══════════════════════════════════════════════════════════════
 
-        # Serpentinization reactor: Fe₂SiO₄ + 3H₂O → 2Fe(OH)₂ + SiO₂ + H₂
+        # Serpentinization reactor: 3 Fe₂SiO₄ + 2 H₂O → 2 Fe₃O₄ + 3 SiO₂ + 2 H₂
         UnitOp(
             id="reactor_serpentinization",
-            type="serpentinization_reactor",
+            type="stoichiometric_reactor",
             params={
                 "residence_time_s": 14400.0,    # 4 hours
                 "T_C": 250.0,                   # 250°C
                 "p_bar": 100.0,                 # 100 bar
-                "conversion": 0.70,
                 "tank_volume_m3": 10.0,
+                "reactions": {
+                    "serpentinization": {
+                        "stoichiometry": {
+                            "Fe2SiO4": -3, "H2O": -2,
+                            "Fe3O4": 2, "SiO2": 3, "H2": 2,
+                        },
+                        "conversion_spec": {
+                            "species": "Fe2SiO4",
+                            "conversion": 0.70,
+                        },
+                    },
+                },
             },
             inputs=["heated_slag_feed"],
             outputs=["serp_product_hot"],
         ),
 
-        # Carbonation reactor: CaO + CO₂ → CaCO₃
+        # Carbonation reactor: CaO + CO₂ → CaCO₃, MgO + CO₂ → MgCO₃
         UnitOp(
             id="reactor_carbonation",
-            type="carbonation_reactor",
+            type="stoichiometric_reactor",
             params={
                 "residence_time_s": 7200.0,     # 2 hours
                 "T_C": 150.0,                   # 150°C
                 "p_bar": 50.0,                  # 50 bar
-                "conversion": 0.85,
                 "tank_volume_m3": 8.0,
+                "reactions": {
+                    "carbonation_CaO": {
+                        "stoichiometry": {
+                            "CaO": -1, "CO2": -1, "CaCO3": 1,
+                        },
+                        "conversion_spec": {
+                            "species": "CaO",
+                            "conversion": 0.85,
+                        },
+                    },
+                    "carbonation_MgO": {
+                        "stoichiometry": {
+                            "MgO": -1, "CO2": -1, "MgCO3": 1,
+                        },
+                        "conversion_spec": {
+                            "species": "MgO",
+                            "conversion": 0.85,
+                        },
+                    },
+                },
             },
             inputs=["heated_co2_feed"],
             outputs=["carb_product_hot"],
@@ -252,7 +282,7 @@ def steel_slag_h2_co2_superstructure() -> Superstructure:
             type="mixer",
             params={},
             inputs=["serp_liquid_residue"],
-            outputs=["scrubbed_liquid"],
+            outputs=["serp_to_carb_liquid"],
             optional=True,
         ),
 
@@ -347,8 +377,6 @@ def steel_slag_h2_co2_superstructure() -> Superstructure:
                temperature_K=323.15, pressure_Pa=5e6),
 
         # ── Inter-reactor streams ───────────────────────────────────
-        Stream(name="scrubbed_liquid", phase="liquid",
-               temperature_K=343.15, pressure_Pa=1e7),
         Stream(name="serp_to_carb_liquid", phase="liquid",
                temperature_K=343.15, pressure_Pa=5e6),
 
