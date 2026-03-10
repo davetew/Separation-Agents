@@ -1,0 +1,593 @@
+# ═══════════════════════════════════════════════════════════════════════
+# EAF Steel Slag Superstructure
+# ═══════════════════════════════════════════════════════════════════════
+# Valorization of Electric Arc Furnace steel slag for iron recovery,
+# H₂ production via serpentinization, and CO₂ mineralization.
+#
+# Throughput basis: 100,000 t/yr (~303 t/d at 330 operating days)
+# Feed: dry slag mixed with water via mixer_water (water amount is a BO parameter)
+#
+# GDP Disjunctions:
+#   1. lims_position: magnetic separation before vs. after serpentinization
+#   2. heat_strategy: supplemental heater vs. full heat recovery only
+#   3. h2_production: serpentinization reactor vs. bypass (no H₂)
+#   4. co2_mineralization: carbonation reactor vs. bypass (no CO₂ seq)
+#   5. cr_mn_recovery: acid leach for Cr/Mn vs. bypass
+#   6. v_recovery: V leach + precipitation vs. bypass
+
+name: eaf_steel_slag
+description: >
+  EAF steel slag valorization for iron recovery (LIMS),
+  H₂ production (serpentinization of fayalite), CO₂
+  sequestration (mineral carbonation of CaO/MgO), and
+  optional Cr/Mn/V metal recovery via acid leaching.
+  GDP choices: LIMS position, heat strategy, Cr/Mn recovery,
+  V recovery. Throughput: 100,000 t/yr.
+objective: minimize_opex
+
+# ─── Feed Streams ───────────────────────────────────────────────────
+streams:
+  slag_feed:
+    phase: solid
+    temperature_K: 298.15
+    pressure_Pa: 101325.0
+    composition_wt:
+      Fe2SiO4: 0.166       # mol_fraction fayalite
+      CaO: 0.510            # mol_fraction
+      MgO: 0.190            # mol_fraction
+      SiO2: 0.104            # mol_fraction free silica
+      Fe3O4: 0.031           # mol_fraction pre-existing magnetite
+
+  water_feed:
+    phase: liquid
+    temperature_K: 298.15
+    pressure_Pa: 101325.0
+    composition_wt:
+      H2O: 1.0
+
+  slag_water_slurry:
+    phase: liquid
+    temperature_K: 298.15
+    pressure_Pa: 101325.0
+
+  co2_feed:
+    phase: gas
+    temperature_K: 298.15
+    pressure_Pa: 101325.0
+    composition_wt:
+      CO2: 8.07
+
+  # ─── Internal Streams ──────────────────────────────────────────────
+  pressurized_slag:
+    phase: liquid
+    temperature_K: 298.15
+    pressure_Pa: 1.0e+7
+
+  pressurized_co2:
+    phase: gas
+    temperature_K: 298.15
+    pressure_Pa: 5.0e+6
+
+  fe_concentrate_pre:
+    phase: solid
+    temperature_K: 298.15
+    pressure_Pa: 1.0e+7
+
+  non_magnetic_slag:
+    phase: liquid
+    temperature_K: 298.15
+    pressure_Pa: 1.0e+7
+
+  heated_slag_feed:
+    phase: liquid
+    temperature_K: 473.15
+    pressure_Pa: 1.0e+7
+
+  reactor_feed:
+    phase: liquid
+    temperature_K: 523.15
+    pressure_Pa: 1.0e+7
+
+  serp_product_hot:
+    phase: liquid
+    temperature_K: 523.15
+    pressure_Pa: 1.0e+7
+
+  serp_product_cooled:
+    phase: liquid
+    temperature_K: 343.15
+    pressure_Pa: 1.0e+7
+
+  h2_gas_product:
+    phase: gas
+    temperature_K: 343.15
+    pressure_Pa: 1.0e+7
+
+  serp_liquid:
+    phase: liquid
+    temperature_K: 343.15
+    pressure_Pa: 1.0e+7
+
+  carbonation_feed_raw:
+    phase: liquid
+    temperature_K: 298.15
+    pressure_Pa: 5.0e+6
+
+  carbonation_feed:
+    phase: liquid
+    temperature_K: 423.15
+    pressure_Pa: 5.0e+6
+
+  carb_product_hot:
+    phase: liquid
+    temperature_K: 458.15
+    pressure_Pa: 5.0e+6
+
+  carb_product_cooled:
+    phase: liquid
+    temperature_K: 323.15
+    pressure_Pa: 5.0e+6
+
+  carbonate_solid_product:
+    phase: solid
+    temperature_K: 323.15
+    pressure_Pa: 101325.0
+
+  carb_liquid_residue:
+    phase: liquid
+    temperature_K: 323.15
+    pressure_Pa: 5.0e+6
+
+  liquid_waste:
+    phase: liquid
+    temperature_K: 323.15
+    pressure_Pa: 101325.0
+
+  # ─── Metal Recovery Streams ──────────────────────────────────────
+  # Cr/Mn acid leach circuit
+  cr_mn_leach_product:
+    phase: liquid
+    temperature_K: 353.15
+    pressure_Pa: 101325.0
+
+  cr_mn_leach_residue:
+    phase: solid
+    temperature_K: 353.15
+    pressure_Pa: 101325.0
+
+  cr_precipitate:
+    phase: solid
+    temperature_K: 323.15
+    pressure_Pa: 101325.0
+
+  cr_precip_filtrate:
+    phase: liquid
+    temperature_K: 323.15
+    pressure_Pa: 101325.0
+
+  mn_precipitate:
+    phase: solid
+    temperature_K: 323.15
+    pressure_Pa: 101325.0
+
+  mn_precip_filtrate:
+    phase: liquid
+    temperature_K: 323.15
+    pressure_Pa: 101325.0
+
+  # Cr/Mn bypass stream
+  cr_mn_bypass_residue:
+    phase: liquid
+    temperature_K: 323.15
+    pressure_Pa: 101325.0
+
+  # V leach circuit
+  v_leach_product:
+    phase: liquid
+    temperature_K: 363.15
+    pressure_Pa: 101325.0
+
+  v_leach_residue:
+    phase: solid
+    temperature_K: 363.15
+    pressure_Pa: 101325.0
+
+  v_precipitate:
+    phase: solid
+    temperature_K: 323.15
+    pressure_Pa: 101325.0
+
+  v_precip_filtrate:
+    phase: liquid
+    temperature_K: 323.15
+    pressure_Pa: 101325.0
+
+  # V bypass stream
+  v_bypass_residue:
+    phase: liquid
+    temperature_K: 323.15
+    pressure_Pa: 101325.0
+
+  # Combined metal recovery waste
+  metal_recovery_waste:
+    phase: liquid
+    temperature_K: 323.15
+    pressure_Pa: 101325.0
+
+# ─── Unit Operations ───────────────────────────────────────────────
+units:
+  # ══════ LIMS Magnetic Separation (on dry crushed slag) ══════
+  # LIMS must operate on dry/crushed feed BEFORE water mixing,
+  # because it only recovers pre-existing ferromagnetic magnetite (Fe₃O₄).
+  # FeO (wüstite) and dissolved Fe²⁺ are NOT magnetic.
+  lims_pre_serp:
+    component: lims
+    params:
+      magnetic_recovery: 0.85
+      field_T: 0.3
+    inputs: [slag_feed]
+    outputs: [fe_concentrate_pre, non_magnetic_slag]
+    optional: true
+    alternatives: [lims_position]
+
+  # Bypass: no magnetic separation
+  no_lims_pre:
+    component: mixer
+    inputs: [slag_feed]
+    outputs: [non_magnetic_slag]
+    optional: true
+    alternatives: [lims_position]
+
+  # ══════ Feed Preparation (after LIMS) ══════
+  mixer_water:
+    component: mixer
+    inputs: [non_magnetic_slag, water_feed]
+    outputs: [slag_water_slurry]
+
+  pump_slag:
+    component: pump
+    params:
+      head_m: 1500.0
+      efficiency: 0.75
+    inputs: [slag_water_slurry]
+    outputs: [pressurized_slag]
+
+  pump_co2:
+    component: pump
+    params:
+      head_m: 800.0
+      efficiency: 0.80
+    inputs: [co2_feed]
+    outputs: [pressurized_co2]
+
+  # ══════ Heat Recovery Network ══════
+  hx_serp_preheat:
+    component: heat_exchanger
+    params:
+      U_Wm2K: 500.0
+      area_m2: 50.0
+      dT_approach_K: 10.0
+      type: counter
+    inputs: [pressurized_slag]
+    outputs: [heated_slag_feed]
+
+  # Optional auxiliary heater
+  aux_heater:
+    component: heat_exchanger
+    params:
+      U_Wm2K: 1000.0
+      area_m2: 20.0
+      dT_approach_K: 5.0
+      type: counter
+    inputs: [heated_slag_feed]
+    outputs: [reactor_feed]
+    optional: true
+    alternatives: [heat_strategy]
+
+  no_aux_heater:
+    component: mixer
+    inputs: [heated_slag_feed]
+    outputs: [reactor_feed]
+    optional: true
+    alternatives: [heat_strategy]
+
+  # ══════ Serpentinization Reactor (Equilibrium) ══════
+  reactor_serpentinization:
+    component: equilibrium_reactor
+    params:
+      residence_time_s: 14400.0
+      T_C: 250.0
+      p_bar: 100.0
+      tank_volume_m3: 10.0
+      equilibrium_phases:
+        - Forsterite
+        - Fayalite
+        - Magnetite
+        - Quartz
+        - Hematite
+        - Brucite
+      gas_phases: []
+      aqueous_elements: [H, O, Fe, Si, Mg]
+      database: supcrtbl
+    inputs: [reactor_feed]
+    outputs: [serp_product_hot]
+    optional: true
+    alternatives: [h2_production]
+
+  # Bypass: skip serpentinization (no H₂ produced)
+  bypass_serp:
+    component: mixer
+    inputs: [reactor_feed]
+    outputs: [serp_product_hot]
+    optional: true
+    alternatives: [h2_production]
+
+  # Hot product heat recovery
+  hx_serp_recovery:
+    component: heat_exchanger
+    params:
+      U_Wm2K: 500.0
+      area_m2: 50.0
+      dT_approach_K: 15.0
+      type: counter
+    inputs: [serp_product_hot]
+    outputs: [serp_product_cooled]
+
+  # ══════ H₂ Gas Separation ══════
+  separator_h2:
+    component: separator
+    params:
+      recovery: 0.95
+      split_fraction: 0.99
+    inputs: [serp_product_cooled]
+    outputs: [h2_gas_product, serp_liquid]
+
+  # ══════ CO₂ Mixing + Carbonation ══════
+  mixer_co2:
+    component: mixer
+    inputs: [pressurized_co2, serp_liquid]
+    outputs: [carbonation_feed_raw]
+
+  hx_carb_preheat:
+    component: heat_exchanger
+    params:
+      U_Wm2K: 800.0
+      area_m2: 30.0
+      dT_approach_K: 10.0
+      type: counter
+    inputs: [carbonation_feed_raw]
+    outputs: [carbonation_feed]
+
+  reactor_carbonation:
+    component: equilibrium_reactor
+    params:
+      residence_time_s: 7200.0
+      T_C: 185.0
+      p_bar: 50.0
+      tank_volume_m3: 8.0
+      equilibrium_phases:
+        - Forsterite
+        - Fayalite
+        - Magnetite
+        - Magnesite
+        - Quartz
+        - Hematite
+        - Brucite
+      gas_phases: ["H2O(g)", "CO2(g)", "H2(g)"]
+      aqueous_elements: [H, O, C, Fe, Si, Mg, Ca]
+      database: supcrtbl
+    inputs: [carbonation_feed]
+    outputs: [carb_product_hot]
+    optional: true
+    alternatives: [co2_mineralization]
+
+  # Bypass: skip carbonation (no CO₂ sequestration)
+  bypass_carb:
+    component: mixer
+    inputs: [carbonation_feed]
+    outputs: [carb_product_hot]
+    optional: true
+    alternatives: [co2_mineralization]
+
+  hx_carb_recovery:
+    component: heat_exchanger
+    params:
+      U_Wm2K: 800.0
+      area_m2: 30.0
+      dT_approach_K: 15.0
+      type: counter
+    inputs: [carb_product_hot]
+    outputs: [carb_product_cooled]
+
+  # ══════ Carbonate Solid Recovery ══════
+  separator_carbonate:
+    component: separator
+    params:
+      recovery: 0.90
+      split_fraction: 0.95
+    inputs: [carb_product_cooled]
+    outputs: [carbonate_solid_product, carb_liquid_residue]
+
+  mixer_waste:
+    component: mixer
+    inputs: [metal_recovery_waste]
+    outputs: [liquid_waste]
+
+  # ══════ Cr/Mn Recovery (Optional) ══════
+  # Equilibrium acid leach to dissolve Cr₂O₃ and MnO
+  leach_cr_mn:
+    component: equilibrium_reactor
+    params:
+      T_C: 80.0
+      p_bar: 1.0
+      residence_time_s: 7200.0
+      tank_volume_m3: 5.0
+      reagent_name: HCl
+      reagent_dosage_gpl: 50.0
+      database: supcrtbl
+      aqueous_elements: "H O Cl Na Ca Mg Fe Si Cr Mn"
+      equilibrium_phases: [Eskolaite, Manganosite, Quartz]
+    inputs: [carb_liquid_residue]
+    outputs: [cr_mn_leach_product, cr_mn_leach_residue]
+    optional: true
+    alternatives: [cr_mn_recovery]
+
+  # Bypass: skip Cr/Mn recovery
+  skip_cr_mn:
+    component: mixer
+    inputs: [carb_liquid_residue]
+    outputs: [cr_mn_bypass_residue]
+    optional: true
+    alternatives: [cr_mn_recovery]
+
+  # Selective Cr precipitation via Gibbs minimization (NaOH → Eskolaite Cr₂O₃)
+  precip_cr:
+    component: equilibrium_reactor
+    params:
+      T_C: 50.0
+      p_bar: 1.0
+      residence_time_s: 3600.0
+      reagent_name: NaOH
+      reagent_dosage_gpl: 12.0
+      database: supcrtbl
+      aqueous_elements: "H O Cl Na Fe Cr Mn"
+      equilibrium_phases: [Eskolaite]
+    inputs: [cr_mn_leach_product]
+    outputs: [cr_precipitate, cr_precip_filtrate]
+    optional: true
+
+  # Mn precipitation via Gibbs minimization (higher pH, NaOH → Bixbyite Mn₂O₃)
+  precip_mn:
+    component: equilibrium_reactor
+    params:
+      T_C: 50.0
+      p_bar: 1.0
+      residence_time_s: 3600.0
+      reagent_name: NaOH
+      reagent_dosage_gpl: 15.0
+      database: supcrtbl
+      aqueous_elements: "H O Cl Na Fe Mn"
+      equilibrium_phases: [Bixbyite, Manganosite]
+    inputs: [cr_precip_filtrate]
+    outputs: [mn_precipitate, mn_precip_filtrate]
+    optional: true
+
+  # ══════ V Recovery (Optional) ══════
+  # Equilibrium acid leach to dissolve V-bearing phases
+  # Note: SUPCRTBL has no V solid minerals; V speciation is aqueous-only
+  # (VO₂⁺, H₂VO₄⁻, etc.)  Quartz included as gangue phase.
+  leach_v:
+    component: equilibrium_reactor
+    params:
+      T_C: 90.0
+      p_bar: 1.0
+      residence_time_s: 10800.0
+      tank_volume_m3: 3.0
+      reagent_name: HCl
+      reagent_dosage_gpl: 60.0
+      database: supcrtbl
+      aqueous_elements: "H O Cl Na Ca Mg Fe Si V"
+      equilibrium_phases: [Quartz]
+    inputs: [cr_mn_leach_residue]
+    outputs: [v_leach_product, v_leach_residue]
+    optional: true
+    alternatives: [v_recovery]
+
+  # Bypass: skip V recovery
+  skip_v:
+    component: mixer
+    inputs: [cr_mn_leach_residue]
+    outputs: [v_bypass_residue]
+    optional: true
+    alternatives: [v_recovery]
+
+  # V₂O₅ precipitation via Gibbs minimization (aqueous V species only)
+  # V precipitates as ammonium metavanadate from aqueous phase
+  precip_v:
+    component: equilibrium_reactor
+    params:
+      T_C: 60.0
+      p_bar: 1.0
+      residence_time_s: 5400.0
+      reagent_name: NH4Cl
+      reagent_dosage_gpl: 20.0
+      database: supcrtbl
+      aqueous_elements: "H O Cl Na N V"
+      equilibrium_phases: []
+    inputs: [v_leach_product]
+    outputs: [v_precipitate, v_precip_filtrate]
+    optional: true
+
+  # Collect all metal recovery waste streams
+  mixer_metal_waste:
+    component: mixer
+    inputs: [mn_precip_filtrate, v_precip_filtrate, cr_mn_bypass_residue, v_bypass_residue]
+    outputs: [metal_recovery_waste]
+
+# ─── GDP Disjunctions ──────────────────────────────────────────────
+disjunctions:
+  lims_position:
+    choices: [lims_pre_serp, no_lims_pre]
+    description: >
+      Magnetic separation on dry crushed slag (before water mixing)
+      to recover pre-existing Fe₃O₄ magnetite.  Only effective on
+      ferromagnetic phases; FeO (wüstite) is NOT recovered.
+  heat_strategy:
+    choices: [aux_heater, no_aux_heater]
+    description: Supplemental heater vs. full heat recovery only
+  h2_production:
+    choices: [reactor_serpentinization, bypass_serp]
+    description: >
+      Serpentinization reactor (produces H₂ + Fe₃O₄) vs. bypass.
+      GDP decides if H₂ revenue justifies reactor + utility cost.
+  co2_mineralization:
+    choices: [reactor_carbonation, bypass_carb]
+    description: >
+      Carbonation reactor (sequesters CO₂ as CaCO₃/MgCO₃) vs. bypass.
+      GDP decides if CO₂ credit revenue justifies reactor + utility cost.
+  cr_mn_recovery:
+    choices: [leach_cr_mn, skip_cr_mn]
+    description: >
+      Acid leach for Cr₂O₃/MnO recovery vs. bypass.
+      GDP decides if Cr/Mn revenue justifies leach + precip cost.
+  v_recovery:
+    choices: [leach_v, skip_v]
+    description: >
+      V₂O₃ acid leach + precipitation vs. bypass.
+      GDP decides if vanadium revenue justifies the circuit.
+
+# ─── Fixed Units (always active) ──────────────────────────────────
+fixed_units:
+  - mixer_water
+  - pump_slag
+  - pump_co2
+  - hx_serp_preheat
+  - hx_carb_preheat
+  - hx_serp_recovery
+  - hx_carb_recovery
+  - separator_h2
+  - separator_carbonate
+  - mixer_co2
+  - mixer_waste
+  - mixer_metal_waste
+
+# ─── Continuous Design Variables (BoTorch bounds) ──────────────────
+continuous_bounds:
+  mixer_water.water_kg: [200.0, 2000.0]
+  reactor_serpentinization.T_C: [200.0, 300.0]
+  reactor_serpentinization.p_bar: [50.0, 300.0]
+  reactor_carbonation.T_C: [100.0, 200.0]
+  reactor_carbonation.p_bar: [10.0, 150.0]
+  hx_serp_preheat.area_m2: [10.0, 100.0]
+  hx_carb_preheat.area_m2: [5.0, 60.0]
+  hx_serp_recovery.area_m2: [10.0, 100.0]
+  hx_carb_recovery.area_m2: [5.0, 60.0]
+  pump_slag.head_m: [500.0, 3000.0]
+  pump_co2.head_m: [100.0, 1500.0]
+  leach_cr_mn.T_C: [50.0, 95.0]
+  leach_cr_mn.residence_time_s: [3600.0, 14400.0]
+  precip_cr.reagent_dosage_gpl: [5.0, 25.0]
+  precip_mn.reagent_dosage_gpl: [5.0, 30.0]
+  leach_v.T_C: [60.0, 95.0]
+  leach_v.residence_time_s: [3600.0, 21600.0]
+  precip_v.reagent_dosage_gpl: [10.0, 40.0]

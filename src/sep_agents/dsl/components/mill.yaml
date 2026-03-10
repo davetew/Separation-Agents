@@ -1,0 +1,16 @@
+type: mill
+description: >
+  Ball, rod, or SAG mill for comminution. Grinds feed to target fineness
+  using Bond work-index scaling.
+defaults:
+  fineness_factor: 0.5
+  E_specific_kWhpt: 15.0
+  media_type: steel
+bounds:
+  fineness_factor: [0.1, 1.0]
+  E_specific_kWhpt: [5.0, 50.0]
+required_params:
+  - fineness_factor
+optional_params:
+  - E_specific_kWhpt
+  - media_type      # "steel", "ceramic", "autogenous"

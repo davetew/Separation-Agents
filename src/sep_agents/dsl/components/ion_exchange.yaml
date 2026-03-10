@@ -1,0 +1,21 @@
+type: ion_exchange
+description: >
+  Ion exchange column for selective adsorption/desorption of dissolved
+  species. Used for REE recovery from leach liquors.
+defaults:
+  selectivity_coeff: 2.0
+  bed_volume_m3: 5.0
+  resin_type: strong_acid_cation
+  flow_rate_BV_per_hr: 2.0
+  T_C: 25.0
+bounds:
+  selectivity_coeff: [1.0, 20.0]
+  bed_volume_m3: [0.5, 50.0]
+  flow_rate_BV_per_hr: [0.5, 10.0]
+required_params:
+  - selectivity_coeff
+  - bed_volume_m3
+optional_params:
+  - resin_type
+  - flow_rate_BV_per_hr
+  - T_C

@@ -1,0 +1,16 @@
+type: thickener
+description: >
+  Gravity thickener for solid-liquid separation. Produces a dense
+  underflow slurry and a clarified overflow.
+defaults:
+  recovery: 0.90
+  underflow_solids_frac: 0.60
+  overflow_clarity: 0.99
+bounds:
+  recovery: [0.70, 0.99]
+  underflow_solids_frac: [0.30, 0.75]
+required_params: []
+optional_params:
+  - recovery
+  - underflow_solids_frac
+  - overflow_clarity

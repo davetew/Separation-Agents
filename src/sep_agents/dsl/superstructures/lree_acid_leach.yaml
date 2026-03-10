@@ -1,0 +1,121 @@
+name: lree_acid_leach
+description: >
+  LREE recovery from HCl acid-leach liquor.
+  Choose between D2EHPA and PC88A extractants,
+  optional scrubbing stage, and oxalate vs hydroxide
+  product precipitation.
+objective: minimize_opex
+
+streams:
+  - name: feed
+    phase: liquid
+    temperature_K: 298.15
+    pressure_Pa: 101325.0
+    composition_wt:
+      "H2O(aq)": 1000.0
+      "Nd+3": 15.0
+      "Ce+3": 20.0
+      "La+3": 10.0
+      "HCl(aq)": 50.0
+  - name: org_extract_d2
+    phase: liquid
+  - name: aq_raffinate_d2
+    phase: liquid
+  - name: org_extract_pc
+    phase: liquid
+  - name: aq_raffinate_pc
+    phase: liquid
+  - name: org_extract
+    phase: liquid
+  - name: scrubbed_org
+    phase: liquid
+  - name: scrub_liquor
+    phase: liquid
+  - name: product_org
+    phase: liquid
+  - name: solid_oxalate
+    phase: solid
+  - name: barren_liquor_ox
+    phase: liquid
+  - name: solid_hydroxide
+    phase: solid
+  - name: barren_liquor_oh
+    phase: liquid
+
+units:
+  # ── SX alternatives (choose one) ────────────────────
+  - id: sx_d2ehpa
+    type: solvent_extraction
+    inputs: [feed]
+    outputs: [org_extract_d2, aq_raffinate_d2]
+    optional: true
+    alternatives: [separation_method]
+    params:
+      distribution_coeff:
+        "Nd+3": 5.0
+        "Ce+3": 2.0
+        "La+3": 1.0
+      organic_to_aqueous_ratio: 1.5
+
+  - id: sx_pc88a
+    type: solvent_extraction
+    inputs: [feed]
+    outputs: [org_extract_pc, aq_raffinate_pc]
+    optional: true
+    alternatives: [separation_method]
+    params:
+      distribution_coeff:
+        "Nd+3": 8.0
+        "Ce+3": 3.5
+        "La+3": 1.2
+      organic_to_aqueous_ratio: 1.2
+
+  # ── Scrubber (optional) ─────────────────────────────
+  - id: scrubber
+    type: solvent_extraction
+    inputs: [org_extract]
+    outputs: [scrubbed_org, scrub_liquor]
+    optional: true
+    params:
+      distribution_coeff:
+        "Nd+3": 0.5
+        "Ce+3": 0.3
+        "La+3": 0.2
+      organic_to_aqueous_ratio: 0.5
+
+  # ── Precipitation alternatives (choose one) ─────────
+  - id: oxalate_precip
+    type: precipitator
+    inputs: [product_org]
+    outputs: [solid_oxalate, barren_liquor_ox]
+    optional: true
+    alternatives: [product_form]
+    params:
+      residence_time_s: 3600.0
+      reagent_dosage_gpl: 15.0
+
+  - id: hydroxide_precip
+    type: precipitator
+    inputs: [product_org]
+    outputs: [solid_hydroxide, barren_liquor_oh]
+    optional: true
+    alternatives: [product_form]
+    params:
+      residence_time_s: 1800.0
+      reagent_dosage_gpl: 8.0
+
+disjunctions:
+  - name: separation_method
+    unit_ids: [sx_d2ehpa, sx_pc88a]
+    description: "Choose SX extractant: D2EHPA vs PC88A"
+  - name: product_form
+    unit_ids: [oxalate_precip, hydroxide_precip]
+    description: "Product precipitation: oxalate vs hydroxide"
+
+fixed_units: []
+
+continuous_bounds:
+  sx_d2ehpa.organic_to_aqueous_ratio: [0.5, 3.0]
+  sx_pc88a.organic_to_aqueous_ratio: [0.5, 3.0]
+  oxalate_precip.reagent_dosage_gpl: [5.0, 30.0]
+  hydroxide_precip.reagent_dosage_gpl: [3.0, 20.0]

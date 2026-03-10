@@ -1,0 +1,71 @@
+name: simple_sx_precip
+description: >
+  Minimal SX → Precipitator with optional scrubber.
+  2 configurations for quick GDP validation.
+objective: minimize_opex
+
+streams:
+  - name: feed
+    phase: liquid
+    temperature_K: 298.15
+    pressure_Pa: 101325.0
+    composition_wt:
+      "H2O(aq)": 1000.0
+      "Nd+3": 15.0
+      "Ce+3": 20.0
+      "La+3": 10.0
+      "HCl(aq)": 50.0
+  - name: org_extract
+    phase: liquid
+  - name: aq_raffinate
+    phase: liquid
+  - name: scrubbed_org
+    phase: liquid
+  - name: scrub_liquor
+    phase: liquid
+  - name: to_precip
+    phase: liquid
+  - name: solid_product
+    phase: solid
+  - name: barren_liquor
+    phase: liquid
+
+units:
+  - id: sx_1
+    type: solvent_extraction
+    inputs: [feed]
+    outputs: [org_extract, aq_raffinate]
+    params:
+      distribution_coeff:
+        "Nd+3": 5.0
+        "Ce+3": 2.0
+        "La+3": 1.0
+      organic_to_aqueous_ratio: 1.5
+
+  - id: scrubber
+    type: solvent_extraction
+    inputs: [org_extract]
+    outputs: [scrubbed_org, scrub_liquor]
+    optional: true
+    params:
+      distribution_coeff:
+        "Nd+3": 0.3
+        "Ce+3": 0.2
+        "La+3": 0.1
+      organic_to_aqueous_ratio: 0.5
+
+  - id: precipitator
+    type: precipitator
+    inputs: [to_precip]
+    outputs: [solid_product, barren_liquor]
+    params:
+      residence_time_s: 3600.0
+      reagent_dosage_gpl: 10.0
+
+disjunctions: []
+
+fixed_units: [sx_1, precipitator]
+
+continuous_bounds:
+  sx_1.organic_to_aqueous_ratio: [0.5, 3.0]
+  precipitator.reagent_dosage_gpl: [5.0, 25.0]

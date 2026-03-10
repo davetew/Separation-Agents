@@ -1,0 +1,40 @@
+name: eaf_steel_slag
+description: >
+  Electric Arc Furnace (EAF) steel slag from secondary steelmaking.
+  Typical composition dominated by iron silicates, calcium oxide,
+  and magnesium oxide. Suitable for iron recovery (LIMS),
+  H₂ production (serpentinization of fayalite), and CO₂
+  mineralization (carbonation of CaO/MgO).
+source: EAF steel plant, typical composition
+throughput_tpd: 303.0      # 100,000 t/yr ÷ 330 operating days
+physical_form: solid
+
+composition:
+  basis: mol_fraction
+  minerals:
+    FeO: 0.20         # fayalite
+    CaO: 0.4             # lime
+    MgO: 0.10             # periclase
+    SiO2: 0.15             # free silica
+    Fe3O4: 0.031
+    Al2O3: 0.05
+    MnO: 0.04
+    Cr2O3: 0.024
+    V2O3: 0.005      
+
+conditions:
+  temperature_K: 298.15
+  pressure_Pa: 101325.0
+
+value_streams:
+  - iron_recovery           # Fe₃O₄ via LIMS
+  - chromium_recovery        # Cr₂O₃ via leaching or magnetic sep
+  - manganese_recovery       # MnO via acid leaching
+  - vanadium_recovery        # V₂O₃ via salt roasting / leaching
+  - h2_production
+  - co2_mineralization
+
+commodity_prices:
+  magnetite_concentrate_usd_t: 120.0
+  h2_green_usd_kg: 4.0
+  co2_credit_usd_t: 60.0

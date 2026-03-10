@@ -1,0 +1,16 @@
+type: pump
+description: >
+  Centrifugal or positive-displacement pump for pressurizing liquid or
+  slurry streams. Head is converted to pressure via fluid density.
+defaults:
+  head_m: 1000.0
+  efficiency: 0.75
+bounds:
+  head_m: [100.0, 5000.0]
+  efficiency: [0.50, 0.90]
+required_params:
+  - head_m
+  - efficiency
+optional_params:
+  - power_kW
+  - type          # "centrifugal" or "positive_displacement"

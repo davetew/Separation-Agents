@@ -1,0 +1,298 @@
+# ═══════════════════════════════════════════════════════════════════════
+# Natural Olivine → H₂ + MgCO₃ Superstructure
+# ═══════════════════════════════════════════════════════════════════════
+# 85% Forsterite (Mg₂SiO₄), 15% Fayalite (Fe₂SiO₄)
+# Serpentinization (H₂) + Direct carbonation (CO₂ → MgCO₃)
+# Feed: dry olivine mixed with water via mixer_water (water amount is a BO parameter)
+#
+# GDP Disjunctions:
+#   1. heat_strategy: auxiliary heater vs. full heat recovery
+#   2. mag_separation: LIMS for Fe₃O₄ vs. no separation
+
+name: olivine_carbonation_h2
+description: >
+  Olivine valorization for CO₂ sequestration (direct carbonation of
+  forsterite → MgCO₃) and H₂ production (serpentinization of
+  fayalite → Fe₃O₄ + H₂). Includes heat recovery, pressurization,
+  and product separation. GDP choices: auxiliary heating strategy +
+  optional magnetic separation for Fe₃O₄ recovery.
+objective: minimize_opex
+
+streams:
+  olivine_feed:
+    phase: solid
+    temperature_K: 298.15
+    pressure_Pa: 101325.0
+    composition_wt:
+      Mg2SiO4: 0.862
+      Fe2SiO4: 0.086
+      SiO2: 0.052
+
+  water_feed:
+    phase: liquid
+    temperature_K: 298.15
+    pressure_Pa: 101325.0
+    composition_wt:
+      H2O: 1.0
+
+  olivine_water_slurry:
+    phase: liquid
+    temperature_K: 298.15
+    pressure_Pa: 101325.0
+
+  co2_feed:
+    phase: gas
+    temperature_K: 298.15
+    pressure_Pa: 101325.0
+    composition_wt:
+      CO2: 1200.0
+
+  pressurized_olivine:
+    phase: liquid
+    temperature_K: 298.15
+    pressure_Pa: 1.0e+7
+  pressurized_co2:
+    phase: gas
+    temperature_K: 298.15
+    pressure_Pa: 1.5e+7
+  preheated_olivine:
+    phase: liquid
+    temperature_K: 473.15
+    pressure_Pa: 1.0e+7
+  heated_olivine:
+    phase: liquid
+    temperature_K: 523.15
+    pressure_Pa: 1.0e+7
+  serp_product_hot:
+    phase: liquid
+    temperature_K: 523.15
+    pressure_Pa: 1.0e+7
+  serp_product_cooled:
+    phase: liquid
+    temperature_K: 343.15
+    pressure_Pa: 1.0e+7
+  h2_gas_product:
+    phase: gas
+    temperature_K: 343.15
+    pressure_Pa: 1.0e+7
+  serp_slurry:
+    phase: liquid
+    temperature_K: 343.15
+    pressure_Pa: 1.0e+7
+  carb_feed_mix:
+    phase: liquid
+    temperature_K: 335.15
+    pressure_Pa: 1.0e+7
+  heated_carb_feed:
+    phase: liquid
+    temperature_K: 458.15
+    pressure_Pa: 1.0e+7
+  carb_product_hot:
+    phase: liquid
+    temperature_K: 458.15
+    pressure_Pa: 1.0e+7
+  carb_product_cooled:
+    phase: liquid
+    temperature_K: 323.15
+    pressure_Pa: 1.0e+7
+  mgco3_solid_product:
+    phase: solid
+    temperature_K: 323.15
+    pressure_Pa: 101325.0
+  carb_liquid_residue:
+    phase: liquid
+    temperature_K: 323.15
+    pressure_Pa: 1.0e+7
+  fe3o4_concentrate:
+    phase: solid
+    temperature_K: 323.15
+    pressure_Pa: 101325.0
+  silica_residue:
+    phase: solid
+    temperature_K: 323.15
+    pressure_Pa: 101325.0
+
+units:
+  mixer_water:
+    component: mixer
+    inputs: [olivine_feed, water_feed]
+    outputs: [olivine_water_slurry]
+
+  pump_olivine:
+    component: pump
+    params:
+      head_m: 1000.0
+      efficiency: 0.75
+    inputs: [olivine_water_slurry]
+    outputs: [pressurized_olivine]
+
+  pump_co2:
+    component: pump
+    params:
+      head_m: 1500.0
+      efficiency: 0.80
+    inputs: [co2_feed]
+    outputs: [pressurized_co2]
+
+  hx_serp_preheat:
+    component: heat_exchanger
+    params:
+      U_Wm2K: 500.0
+      area_m2: 40.0
+      dT_approach_K: 15.0
+    inputs: [pressurized_olivine]
+    outputs: [preheated_olivine]
+
+  aux_heater:
+    component: heat_exchanger
+    params:
+      U_Wm2K: 1000.0
+      area_m2: 5.0
+      dT_approach_K: 5.0
+    inputs: [preheated_olivine]
+    outputs: [heated_olivine]
+    alternatives: [heat_strategy]
+
+  no_aux_heater:
+    component: separator
+    params:
+      recovery: 1.0
+    inputs: [preheated_olivine]
+    outputs: [heated_olivine]
+    alternatives: [heat_strategy]
+
+  reactor_serpentinization:
+    component: equilibrium_reactor
+    params:
+      T_C: 250.0
+      p_bar: 100.0
+      tank_volume_m3: 10.0
+      equilibrium_phases:
+        - Forsterite
+        - Fayalite
+        - Magnetite
+        - Quartz
+        - Hematite
+        - Brucite
+      gas_phases: ["H2(g)", "CO2(g)", "H2O(g)", "O2(g)"]
+      aqueous_elements: "H O C Si Mg Fe"
+      database: supcrtbl
+    inputs: [heated_olivine]
+    outputs: [serp_product_hot]
+
+  hx_serp_recovery:
+    component: heat_exchanger
+    params:
+      U_Wm2K: 500.0
+      area_m2: 50.0
+      dT_approach_K: 15.0
+    inputs: [serp_product_hot]
+    outputs: [serp_product_cooled]
+
+  separator_h2:
+    component: separator
+    params:
+      recovery: 0.95
+    inputs: [serp_product_cooled]
+    outputs: [h2_gas_product, serp_slurry]
+
+  mixer_co2:
+    component: mixer
+    inputs: [serp_slurry, pressurized_co2]
+    outputs: [carb_feed_mix]
+
+  hx_carb_preheat:
+    component: heat_exchanger
+    params:
+      U_Wm2K: 800.0
+      area_m2: 30.0
+      dT_approach_K: 10.0
+    inputs: [carb_feed_mix]
+    outputs: [heated_carb_feed]
+
+  reactor_carbonation:
+    component: equilibrium_reactor
+    params:
+      T_C: 185.0
+      p_bar: 150.0
+      tank_volume_m3: 15.0
+      equilibrium_phases:
+        - Forsterite
+        - Fayalite
+        - Magnetite
+        - Magnesite
+        - Quartz
+        - Hematite
+        - Brucite
+      gas_phases: ["H2(g)", "CO2(g)", "H2O(g)", "O2(g)"]
+      aqueous_elements: "H O C Si Mg Fe"
+      database: supcrtbl
+    inputs: [heated_carb_feed]
+    outputs: [carb_product_hot]
+
+  hx_carb_recovery:
+    component: heat_exchanger
+    params:
+      U_Wm2K: 600.0
+      area_m2: 60.0
+      dT_approach_K: 10.0
+    inputs: [carb_product_hot]
+    outputs: [carb_product_cooled]
+
+  separator_carbonate:
+    component: separator
+    params:
+      recovery: 0.90
+    inputs: [carb_product_cooled]
+    outputs: [mgco3_solid_product, carb_liquid_residue]
+
+  lims_fe3o4:
+    component: lims
+    params:
+      magnetic_recovery: 0.85
+    inputs: [carb_liquid_residue]
+    outputs: [fe3o4_concentrate, silica_residue]
+    alternatives: [mag_separation]
+
+  no_mag_sep:
+    component: separator
+    params:
+      recovery: 1.0
+    inputs: [carb_liquid_residue]
+    outputs: [silica_residue]
+    alternatives: [mag_separation]
+
+disjunctions:
+  heat_strategy:
+    choices: [aux_heater, no_aux_heater]
+    description: Supplemental heating vs full heat recovery only
+  mag_separation:
+    choices: [lims_fe3o4, no_mag_sep]
+    description: Magnetic separation of Fe₃O₄ vs no separation
+
+fixed_units:
+  - mixer_water
+  - pump_olivine
+  - pump_co2
+  - hx_serp_preheat
+  - hx_carb_preheat
+  - reactor_serpentinization
+  - reactor_carbonation
+  - hx_serp_recovery
+  - hx_carb_recovery
+  - separator_h2
+  - separator_carbonate
+  - mixer_co2
+
+continuous_bounds:
+  mixer_water.water_kg: [300.0, 3000.0]
+  reactor_serpentinization.T_C: [200.0, 300.0]
+  reactor_serpentinization.p_bar: [50.0, 300.0]
+  reactor_carbonation.T_C: [150.0, 200.0]
+  reactor_carbonation.p_bar: [50.0, 200.0]
+  hx_serp_preheat.area_m2: [10.0, 100.0]
+  hx_carb_preheat.area_m2: [5.0, 60.0]
+  hx_serp_recovery.area_m2: [10.0, 100.0]
+  hx_carb_recovery.area_m2: [10.0, 120.0]
+  pump_olivine.head_m: [500.0, 3000.0]
+  pump_co2.head_m: [500.0, 2000.0]

@@ -10,6 +10,26 @@ description: Generate a LaTeX Beamer presentation summarizing a valorization stu
 
 Given completed valorization analysis and/or report (from `/valorization-report` or `/process-optimization`), this workflow produces a LaTeX Beamer slide deck for stakeholder or academic presentation, using the **Step Function branded slide format**.
 
+> [!CAUTION]
+> **Critical constraints — violations will produce incorrect output:**
+> - **DO NOT** use `\usetheme{metropolis}` or any other Beamer theme — use `\usepackage{sf-branding}` ONLY
+> - **DO NOT** compile with `pdflatex` — use `lualatex` with `TEXINPUTS` set to `/Users/davidtew/stepfunc/Presentations/formatting//`
+> - **DO NOT** save output to `docs/` — save to `presentations/<resource>_YYYY-MM-DD_HHMM/`
+> - **DO** end with `\closingSlide` (not a custom closing frame)
+> - **DO** include a big number slide using the template in Step 3
+> - **DO** include `\tableofcontents` outline slide
+> - **DO** style all TikZ for dark background: `draw=white` or `draw=StepColor!60`, `fill=StepColor!15`
+> - **DO** use `text=black` inside light-filled boxes (e.g., `fill=StepElectric!15`); use `text=white` only for labels outside boxes or on dark fills
+> - **DO** size PFD nodes compactly (max `minimum width=1.6cm`, `node distance=0.8cm and 1.1cm`, `font=\tiny`) to fit on slide
+
+> [!IMPORTANT]
+> **Mandatory consistency verification — perform BEFORE compiling the final PDF:**
+>
+> 1. **Topology↔Revenue consistency**: The revenue table, waterfall chart, and big-number headline MUST only include products/credits from the **optimal topology**. If T1 excludes a unit (e.g., CO₂ carbonation, V leach), the revenue slides MUST NOT include that unit's products or credits. Products from excluded units should appear only in *alternative* topology rows in the trade-study table.
+> 2. **Topology↔PFD consistency**: The PFD diagram must match the identified optimal topology. Bypassed units should use the `skip` style, active units the `unit` style. No active units should appear in the PFD that are bypassed in the optimal topology.
+> 3. **Number consistency**: Every numeric figure (revenue/t, OPEX/t, CAPEX, NPV, IRR, payback) must trace back to Table → Waterfall → Big-Number → Summary. If any single number changes, ALL downstream appearances must be updated.
+> 4. **Cross-document consistency**: If both a report and presentation exist, they must agree on all numeric results. Compile and spot-check both after edits.
+
 ---
 
 ## Step 1: Gather Results
@@ -135,25 +155,29 @@ Use these colors for consistent visual identity:
 
 #### Section 2: Process Design (4-5 slides)
 - Slide: Simplified TikZ PFD (fewer details than report version)
+- **PFD must show all reagent and utility inputs** (water, HCl, NaOH, NH₄Cl, etc.) as distinct nodes feeding into the appropriate unit operations. Use `StepPurple!15` fill and dashed arrows (`rin` style) to distinguish reagent feeds from process streams.
 - Slide(s): Stream table, with pressures, temperatures, flow rates and compositions
 - Slide(s): Key process stages with reactions (1 slide per major stage)
 - Slide: Modeling methodology overview (three-tier hierarchy, 1 slide)
+
+> [!IMPORTANT]
+> All leach and precipitation units must be modeled via `equilibrium_reactor` (Gibbs energy minimization). Do not use empirical `leach_reactor` or `precipitator`. Ensure the modeling methodology slide reflects this.
 
 #### Section 3: GDP Analysis (2–3 slides)
 - Slide: Superstructure overview (disjunctions, topology count)
 - Slide: Topology ranking table (top 5, condensed)
 - Slide: Optimal topology description with key differentiators
 
-#### Section 4: Results (4-5 slides)
+#### Section 4: Results (5–7 slides)
 - Slide: Simulation-derived KPIs (key recoveries, conversions)
-- Slide: Economics summary (CAPEX/OPEX bar chart or table)
-- Slide: Revenue breakdown (pie chart or stacked bar)
-- Slide: **Big number slide** — Net value per tonne feedstock (large, bold, centered)
-- Slide: Major economic and technical assumptions that drive the economics
+- Slide: Revenue breakdown (table or stacked bar)
+- Slide: **Levelized net value** — big number (Revenue − OPEX − EAC) with a TikZ **waterfall bridge chart** showing each revenue stream (+Cr₂O₃, +V₂O₅, etc.) then cost deductions (−OPEX, −EAC) to final net value
+- Slide: Key economic assumptions (plant parameters + commodity prices)
 
-#### Section 5: Optimization & Sensitivity (2–3 slides)
-- Slide: BoTorch results (base vs. optimal, improvement)
-- Slide: Cost sensitivity (top-5 drivers, horizontal bar chart or table)
+#### Section 5: Sensitivity & Cost Structure (4–5 slides)
+- Slide: **NPV tornado chart** — one-at-a-time ±30% perturbation, **top 6 parameters**, each y-axis label must show the **nominal base value** in parentheses (e.g., "Cr₂O₃ price ($9,000/t)"). Do NOT perturb multiple parameters simultaneously. Use `StepRed` for adverse, `StepGreen!80` for favorable. Show base NPV dashed line. Invert colors for cost/rate parameters where increase = adverse.
+- Slide: **CAPEX breakdown** — horizontal bar chart by process area (e.g., leach + precip, feed prep, LIMS, utilities, engineering). Show M USD and % share.
+- Slide: **OPEX breakdown** — horizontal bar chart by cost category. Each label must include the **nominal specific unit cost** (e.g., "HCl @ $0.30/kg", "Electricity @ $0.08/kWh", "Labor — 8 FTE @ $35/hr", "Maintenance — 1.1% of CAPEX"). Show M USD/yr and % share.
 - Optional: Pareto front or convergence plot if available
 
 #### Section 6: Conclusions (1–2 slides)
@@ -188,19 +212,35 @@ For process flow diagrams and other TikZ graphics on the dark `StepDark` backgro
 - Use `StepGreen!15` for product boxes
 - Use `StepOrange!15` for feed boxes
 - Use `white` or `StepGrey` for arrows and stream lines (`draw=StepGrey` or `draw=white`)
-- Ensure all TikZ text is explicitly set to `text=white`
+- Use `text=black` inside light-filled boxes (15% opacity fills are too light for white text)
+- Use `text=white` only for labels placed directly on the dark slide background
+- **Node sizing**: Use `minimum width=1.6cm`, `minimum height=0.5cm`, `font=\tiny` to ensure PFD fits on slide
+- **Node spacing**: Use `node distance=0.8cm and 1.1cm` for compact layout
 
 ### Big Number Slide Template
 
 ```latex
-\begin{frame}{Net Value}
+\begin{frame}{Levelized Net Value}
 \centering
-\vspace{2cm}
-{\Huge\textbf{\textcolor{StepGreen}{\$XXX/t}}}\\[12pt]
-{\large Net value per tonne of [resource]}\\[8pt]
-{\normalsize
-\textcolor{StepGreen}{Revenue: \$YYY/t} \quad
-\textcolor{StepRed}{Cost: \$ZZZ/t}}
+{\Large\textbf{\textcolor{StepGreen}{\$XXX/t}} levelized net value of production}\\[4pt]
+% === Waterfall (bridge) chart ===
+\begin{tikzpicture}[y=0.009cm]
+  \pgfmathsetmacro{\bw}{0.42}
+  % Revenue bars (cumulative, green shades)
+  \fill[StepGreen!70] (1-\bw,0) rectangle (1+\bw,<rev1>);
+  \node[above, font=\tiny, text=white] at (1,<rev1>) {+<rev1>};
+  \node[below, font=\tiny, text=white] at (1,-15) {Product 1};
+  % ... additional revenue bars stacked upward ...
+  % Cost bars (deductions, red shades)
+  \fill[StepRed!70] (5.2-\bw,<top-opex>) rectangle (5.2+\bw,<top>);
+  \node[right, font=\tiny, text=white] at (5.2+\bw,<mid>) {-OPEX};
+  \fill[StepRed!50] (6.4-\bw,<net>) rectangle (6.4+\bw,<top-opex>);
+  \node[right, font=\tiny, text=white] at (6.4+\bw,<mid2>) {-EAC};
+  % Net value bar
+  \fill[StepElectric] (7.8-\bw,0) rectangle (7.8+\bw,<net>);
+  \node[above, font=\scriptsize\bfseries, text=white] at (7.8,<net>) {<net>};
+  % Y-axis, connectors, etc.
+\end{tikzpicture}
 \end{frame}
 ```
 

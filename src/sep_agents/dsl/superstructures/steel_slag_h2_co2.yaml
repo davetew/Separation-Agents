@@ -1,0 +1,299 @@
+# ═══════════════════════════════════════════════════════════════════════
+# Steel Slag → H₂ + CaCO₃ Superstructure
+# ═══════════════════════════════════════════════════════════════════════
+# BOF (Basic Oxygen Furnace) steel slag valorization.
+# Series: serpentinization (fayalite → H₂) → carbonation (CaO+MgO → CaCO₃/MgCO₃)
+# Feed: dry slag mixed with water via mixer_water (water amount is a BO parameter)
+#
+# GDP Disjunctions:
+#   1. heat_strategy: supplemental heater vs. full heat recovery
+
+name: steel_slag_h2_co2
+description: >
+  Steel slag valorization for H₂ production (serpentinization of
+  fayalite) and CO₂ sequestration (mineral carbonation of CaO/MgO).
+  Includes heat recovery network, pressurization pumps, and product
+  separators. GDP choices: supplemental heating vs full heat recovery;
+  optional inter-reactor scrubbing.
+objective: minimize_opex
+
+streams:
+  slag_feed:
+    phase: solid
+    temperature_K: 298.15
+    pressure_Pa: 101325.0
+    composition_wt:
+      Fe2SiO4: 0.50
+      CaO: 0.25
+      MgO: 0.15
+      SiO2: 0.10
+
+  water_feed:
+    phase: liquid
+    temperature_K: 298.15
+    pressure_Pa: 101325.0
+    composition_wt:
+      H2O: 1.0
+
+  slag_water_slurry:
+    phase: liquid
+    temperature_K: 298.15
+    pressure_Pa: 101325.0
+
+  co2_feed:
+    phase: gas
+    temperature_K: 298.15
+    pressure_Pa: 101325.0
+    composition_wt:
+      CO2: 44.0
+
+  pressurized_slag:
+    phase: liquid
+    temperature_K: 298.15
+    pressure_Pa: 1.0e+7
+  pressurized_co2:
+    phase: gas
+    temperature_K: 298.15
+    pressure_Pa: 5.0e+6
+  heated_slag_feed:
+    phase: liquid
+    temperature_K: 473.15
+    pressure_Pa: 1.0e+7
+  boosted_slag_feed:
+    phase: liquid
+    temperature_K: 523.15
+    pressure_Pa: 1.0e+7
+  hot_co2_mix:
+    phase: liquid
+    temperature_K: 298.15
+    pressure_Pa: 5.0e+6
+  heated_co2_feed:
+    phase: liquid
+    temperature_K: 423.15
+    pressure_Pa: 5.0e+6
+  serp_product_hot:
+    phase: liquid
+    temperature_K: 523.15
+    pressure_Pa: 1.0e+7
+  carb_product_hot:
+    phase: liquid
+    temperature_K: 423.15
+    pressure_Pa: 5.0e+6
+  serp_product_cooled:
+    phase: liquid
+    temperature_K: 343.15
+    pressure_Pa: 1.0e+7
+  carb_product_cooled:
+    phase: liquid
+    temperature_K: 323.15
+    pressure_Pa: 5.0e+6
+  h2_gas_product:
+    phase: gas
+    temperature_K: 343.15
+    pressure_Pa: 1.0e+7
+  serp_liquid_residue:
+    phase: liquid
+    temperature_K: 343.15
+    pressure_Pa: 1.0e+7
+  carbonate_solid_product:
+    phase: solid
+    temperature_K: 323.15
+    pressure_Pa: 101325.0
+  carb_liquid_residue:
+    phase: liquid
+    temperature_K: 323.15
+    pressure_Pa: 5.0e+6
+  serp_to_carb_liquid:
+    phase: liquid
+    temperature_K: 343.15
+    pressure_Pa: 5.0e+6
+  liquid_waste:
+    phase: liquid
+    temperature_K: 323.15
+    pressure_Pa: 101325.0
+
+units:
+  mixer_water:
+    component: mixer
+    inputs: [slag_feed, water_feed]
+    outputs: [slag_water_slurry]
+
+  pump_slag:
+    component: pump
+    params:
+      head_m: 1000.0
+      efficiency: 0.75
+    inputs: [slag_water_slurry]
+    outputs: [pressurized_slag]
+
+  pump_co2:
+    component: pump
+    params:
+      head_m: 500.0
+      efficiency: 0.80
+    inputs: [co2_feed]
+    outputs: [pressurized_co2]
+
+  hx_serp_preheat:
+    component: heat_exchanger
+    params:
+      U_Wm2K: 500.0
+      area_m2: 50.0
+      dT_approach_K: 10.0
+      type: counter
+    inputs: [pressurized_slag]
+    outputs: [heated_slag_feed]
+
+  hx_carb_preheat:
+    component: heat_exchanger
+    params:
+      U_Wm2K: 800.0
+      area_m2: 30.0
+      dT_approach_K: 10.0
+      type: counter
+    inputs: [hot_co2_mix]
+    outputs: [heated_co2_feed]
+
+  reactor_serpentinization:
+    component: stoichiometric_reactor
+    params:
+      residence_time_s: 14400.0
+      T_C: 250.0
+      p_bar: 100.0
+      tank_volume_m3: 10.0
+      reactions:
+        serpentinization:
+          stoichiometry:
+            Fe2SiO4: -3
+            H2O: -2
+            Fe3O4: 2
+            SiO2: 3
+            H2: 2
+          conversion_spec:
+            species: Fe2SiO4
+            conversion: 0.70
+    inputs: [heated_slag_feed]
+    outputs: [serp_product_hot]
+
+  reactor_carbonation:
+    component: stoichiometric_reactor
+    params:
+      residence_time_s: 7200.0
+      T_C: 150.0
+      p_bar: 50.0
+      tank_volume_m3: 8.0
+      reactions:
+        carbonation_CaO:
+          stoichiometry: {CaO: -1, CO2: -1, CaCO3: 1}
+          conversion_spec: {species: CaO, conversion: 0.85}
+        carbonation_MgO:
+          stoichiometry: {MgO: -1, CO2: -1, MgCO3: 1}
+          conversion_spec: {species: MgO, conversion: 0.85}
+    inputs: [heated_co2_feed]
+    outputs: [carb_product_hot]
+
+  hx_serp_recovery:
+    component: heat_exchanger
+    params:
+      U_Wm2K: 500.0
+      area_m2: 50.0
+      dT_approach_K: 15.0
+      type: counter
+    inputs: [serp_product_hot]
+    outputs: [serp_product_cooled]
+
+  hx_carb_recovery:
+    component: heat_exchanger
+    params:
+      U_Wm2K: 800.0
+      area_m2: 30.0
+      dT_approach_K: 15.0
+      type: counter
+    inputs: [carb_product_hot]
+    outputs: [carb_product_cooled]
+
+  aux_heater_serp:
+    component: heat_exchanger
+    params:
+      U_Wm2K: 1000.0
+      area_m2: 20.0
+      dT_approach_K: 5.0
+      type: counter
+    inputs: [heated_slag_feed]
+    outputs: [boosted_slag_feed]
+    optional: true
+    alternatives: [heat_strategy]
+
+  no_aux_heater:
+    component: mixer
+    inputs: [heated_slag_feed]
+    outputs: [boosted_slag_feed]
+    optional: true
+    alternatives: [heat_strategy]
+
+  separator_h2:
+    component: separator
+    params:
+      recovery: 0.95
+      split_fraction: 0.99
+    inputs: [serp_product_cooled]
+    outputs: [h2_gas_product, serp_liquid_residue]
+
+  separator_carbonate:
+    component: separator
+    params:
+      recovery: 0.90
+      split_fraction: 0.95
+    inputs: [carb_product_cooled]
+    outputs: [carbonate_solid_product, carb_liquid_residue]
+
+  scrubber:
+    component: mixer
+    inputs: [serp_liquid_residue]
+    outputs: [serp_to_carb_liquid]
+    optional: true
+
+  mixer_co2:
+    component: mixer
+    inputs: [pressurized_co2, serp_to_carb_liquid]
+    outputs: [hot_co2_mix]
+
+  mixer_waste:
+    component: mixer
+    inputs: [carb_liquid_residue]
+    outputs: [liquid_waste]
+
+disjunctions:
+  heat_strategy:
+    choices: [aux_heater_serp, no_aux_heater]
+    description: "Supplemental heating: auxiliary heater vs full heat recovery only"
+
+fixed_units:
+  - mixer_water
+  - pump_slag
+  - pump_co2
+  - hx_serp_preheat
+  - hx_carb_preheat
+  - reactor_serpentinization
+  - reactor_carbonation
+  - hx_serp_recovery
+  - hx_carb_recovery
+  - separator_h2
+  - separator_carbonate
+  - mixer_co2
+  - mixer_waste
+
+continuous_bounds:
+  mixer_water.water_kg: [200.0, 2000.0]
+  reactor_serpentinization.T_C: [200.0, 300.0]
+  reactor_serpentinization.p_bar: [50.0, 300.0]
+  reactor_serpentinization.residence_time_s: [3600.0, 86400.0]
+  reactor_carbonation.T_C: [100.0, 200.0]
+  reactor_carbonation.p_bar: [10.0, 100.0]
+  reactor_carbonation.residence_time_s: [1800.0, 28800.0]
+  hx_serp_preheat.area_m2: [10.0, 100.0]
+  hx_carb_preheat.area_m2: [5.0, 60.0]
+  hx_serp_recovery.area_m2: [10.0, 100.0]
+  hx_carb_recovery.area_m2: [5.0, 60.0]
+  pump_slag.head_m: [500.0, 3000.0]
+  pump_co2.head_m: [100.0, 1000.0]

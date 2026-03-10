@@ -14,7 +14,26 @@ When the user provides a raw material (mine tailings, ore, slag, brine, industri
 
 ## Step 1: Gather Composition Data
 
-Collect or infer the raw-material composition from the user. Required information:
+### 1a. Check the Raw Materials Library
+
+Before gathering new data, check whether the material already exists in the library:
+
+```python
+from sep_agents.dsl.yaml_loader import list_raw_materials, load_raw_material
+
+# List available materials
+for m in list_raw_materials():
+    print(f"  {m['name']}: {m['description'][:80]}")
+
+# If the material exists, load and reuse it
+mat = load_raw_material("eaf_steel_slag")  # returns dict with composition, conditions, etc.
+```
+
+If the material is found, present it to the user for confirmation and skip to Step 3 (value streams). If the user wants to update the composition, load the existing data as a starting point.
+
+### 1b. Collect New Composition
+
+If the material is not in the library, collect or infer the raw-material composition from the user. Required information:
 
 - **Mineralogy** (mineral phases and approximate abundances, e.g., mol% or wt%)
 - **Metal assay** (grade of valuable metals: Ni, Cu, Co, REE, PGE, etc.)
@@ -119,3 +138,36 @@ After completing this workflow, recommend that the user proceed with:
 /superstructure-selection
 ```
 passing the `feed_characterization.yaml` and value stream summary as context.
+
+---
+
+## Step 6: Persist to Raw Materials Library
+
+After the user confirms the characterization (or at the end of the workflow), save the raw material to the YAML library so it is available for future analyses:
+
+```python
+from sep_agents.dsl.yaml_loader import save_raw_material
+
+material_data = {
+    "name": "<material_name>",
+    "description": "<description>",
+    "source": "<source>",
+    "throughput_tpd": <throughput>,
+    "physical_form": "<solid|slurry|brine|liquid>",
+    "composition": {
+        "basis": "<mol|wt_pct|wt_kg>",
+        "minerals": {"<Species>": <amount>, ...},
+        "water_kg": <water>,
+    },
+    "conditions": {
+        "temperature_K": <T>,
+        "pressure_Pa": <P>,
+    },
+    "value_streams": ["<stream1>", "<stream2>", ...],
+    "commodity_prices": {"<product>_usd_<unit>": <price>, ...},
+}
+
+save_raw_material(material_data, overwrite=True)
+```
+
+This ensures every raw material evaluated through the tool is automatically catalogued for reuse.

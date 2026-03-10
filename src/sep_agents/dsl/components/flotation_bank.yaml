@@ -1,0 +1,21 @@
+type: flotation_bank
+description: >
+  Froth flotation cell bank. First-order kinetic model with ultimate
+  recovery and rate constant. Used for sulfide/oxide mineral recovery.
+defaults:
+  k_s_1ps: 0.5
+  R_inf: 0.90
+  air_rate_m3m2s: 0.02
+  froth_recovery: 0.80
+  stages: 4
+bounds:
+  k_s_1ps: [0.05, 2.0]
+  R_inf: [0.50, 0.99]
+  stages: [2, 12]
+required_params:
+  - k_s_1ps
+  - R_inf
+optional_params:
+  - air_rate_m3m2s
+  - froth_recovery
+  - stages

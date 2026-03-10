@@ -1,0 +1,31 @@
+name: olivine
+description: >
+  Olivine-rich ultramafic rock, predominantly forsterite (Mg₂SiO₄)
+  with minor fayalite (Fe₂SiO₄). Suitable for H₂ production via
+  aqueous serpentinization, CO₂ mineralization, and magnetite
+  recovery from serpentinized residue.
+source: Ultramafic ore body, typical olivine composition
+throughput_tpd: 303.0      # 100,000 t/yr ÷ 330 operating days
+physical_form: solid
+
+composition:
+  basis: mol_fraction
+  minerals:
+    Mg2SiO4: 0.862          # forsterite (dominant)
+    Fe2SiO4: 0.086           # fayalite
+    SiO2: 0.052              # free silica
+
+conditions:
+  temperature_K: 298.15
+  pressure_Pa: 101325.0
+
+value_streams:
+  - h2_production
+  - co2_mineralization
+  - iron_recovery
+
+commodity_prices:
+  magnetite_concentrate_usd_t: 120.0
+  h2_green_usd_kg: 4.0
+  co2_credit_usd_t: 60.0
+  mgco3_usd_t: 200.0

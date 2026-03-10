@@ -1,0 +1,8 @@
+type: mixer
+description: >
+  Simple stream mixer — combines two or more inlet streams into one outlet.
+  No parameters required; thermodynamic mixing is handled by the solver.
+defaults: {}
+bounds: {}
+required_params: []
+optional_params: []

@@ -1,0 +1,22 @@
+type: solvent_extraction
+description: >
+  Multi-stage counter-current solvent extraction (SX) cascade.
+  Distribution coefficient and O:A ratio govern separation performance.
+defaults:
+  distribution_coeff: 5.0
+  organic_to_aqueous_ratio: 1.0
+  stages: 4
+  T_C: 25.0
+bounds:
+  distribution_coeff: [0.5, 50.0]
+  organic_to_aqueous_ratio: [0.2, 5.0]
+  stages: [1, 12]
+  T_C: [15.0, 60.0]
+required_params:
+  - distribution_coeff
+  - organic_to_aqueous_ratio
+optional_params:
+  - stages
+  - T_C
+  - extractant
+  - diluent

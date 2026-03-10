@@ -1,0 +1,17 @@
+type: lims
+description: >
+  Low-Intensity Magnetic Separator (LIMS). Recovers ferromagnetic
+  minerals (primarily Fe₃O₄ magnetite) from a dry or slurry feed.
+  Not effective on paramagnetic or dissolved species (e.g., FeO, Cr₂O₃, MnO).
+  Requires feed containing pre-existing magnetic phases.
+  First output: magnetic concentrate. Second output: non-magnetic tailings.
+defaults:
+  magnetic_recovery: 0.85
+  field_T: 0.3
+bounds:
+  magnetic_recovery: [0.50, 0.98]
+  field_T: [0.05, 1.0]
+required_params:
+  - magnetic_recovery
+optional_params:
+  - field_T

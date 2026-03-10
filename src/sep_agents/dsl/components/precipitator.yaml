@@ -1,0 +1,23 @@
+type: precipitator
+description: >
+  Chemical precipitation reactor. Adds a reagent to induce selective
+  precipitation of dissolved species. Used for REE oxalate, hydroxide,
+  or carbonate precipitation.
+defaults:
+  residence_time_s: 3600.0
+  reagent_dosage_gpl: 10.0
+  T_C: 50.0
+  target_pH: 8.0
+bounds:
+  residence_time_s: [600.0, 14400.0]
+  reagent_dosage_gpl: [1.0, 100.0]
+  T_C: [20.0, 100.0]
+  target_pH: [3.0, 12.0]
+required_params:
+  - residence_time_s
+  - reagent_dosage_gpl
+optional_params:
+  - T_C
+  - target_pH
+  - p_bar
+  - reagent_name

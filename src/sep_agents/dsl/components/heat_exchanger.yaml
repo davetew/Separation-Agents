@@ -1,0 +1,19 @@
+type: heat_exchanger
+description: >
+  Shell-and-tube or plate heat exchanger. Counter-current or parallel flow.
+  Duty is computed from U·A·LMTD.
+defaults:
+  U_Wm2K: 500.0
+  area_m2: 50.0
+  dT_approach_K: 10.0
+  type: counter
+bounds:
+  area_m2: [5.0, 200.0]
+  U_Wm2K: [100.0, 2000.0]
+  dT_approach_K: [3.0, 30.0]
+required_params:
+  - U_Wm2K
+  - area_m2
+optional_params:
+  - dT_approach_K
+  - type          # "counter" or "parallel"

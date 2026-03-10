@@ -1,0 +1,20 @@
+type: leach_reactor
+description: >
+  Agitated leach reactor for acid/base dissolution of minerals.
+  Temperature and residence time control dissolution kinetics.
+defaults:
+  residence_time_s: 7200.0
+  T_C: 80.0
+  tank_volume_m3: 10.0
+  agitation_power_kW: 15.0
+bounds:
+  residence_time_s: [1800.0, 86400.0]
+  T_C: [25.0, 200.0]
+  tank_volume_m3: [1.0, 100.0]
+required_params:
+  - residence_time_s
+  - T_C
+optional_params:
+  - tank_volume_m3
+  - agitation_power_kW
+  - p_bar

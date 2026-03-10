@@ -1,0 +1,17 @@
+type: cyclone
+description: >
+  Hydrocyclone classifier. Separates particles by size using centrifugal
+  force. Cut size (d50c) defines the classification boundary.
+defaults:
+  d50c_um: 75.0
+  sharpness_alpha: 3.0
+  pressure_kPa: 150.0
+bounds:
+  d50c_um: [10.0, 300.0]
+  sharpness_alpha: [1.0, 10.0]
+  pressure_kPa: [50.0, 400.0]
+required_params:
+  - d50c_um
+optional_params:
+  - sharpness_alpha
+  - pressure_kPa

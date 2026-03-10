@@ -1,0 +1,552 @@
+\documentclass[aspectratio=169]{beamer}
+
+% --- Step Function Branding (replaces any generic Beamer theme) ---
+% DO NOT use \usetheme{metropolis}, \usetheme{Madrid}, or any other theme.
+\usepackage{sf-branding}
+
+% --- Additional packages ---
+\usepackage{appendixnumberbeamer}
+\usepackage{amsmath,amssymb}
+\usepackage{siunitx}
+\sisetup{group-separator={,}, group-minimum-digits=4}
+\usepackage{graphicx}
+\usepackage{booktabs}
+\usepackage{tikz}
+\usetikzlibrary{arrows.meta,positioning,shapes.geometric}
+
+% --- Project-specific colors ---
+\definecolor{revenue}{HTML}{00CC66}
+\definecolor{cost}{HTML}{EF4444}
+
+\title{Techno-Economic Assessment of\\[4pt] \textbf{EAF Steel Slag} Valorization}
+\subtitle{Metal Recovery \(\cdot\) Iron Recovery \(\cdot\) GDP Superstructure Optimization}
+\author{Step Function}
+\date{\today}
+
+\begin{document}
+
+% ═══ Title ═══
+\begin{frame}
+\titlepage
+\end{frame}
+
+% ═══ Outline ═══
+\begin{frame}{Outline}
+\tableofcontents
+\end{frame}
+
+% ═══════════════════════════════════════
+\section{Background \& Opportunity}
+
+% ═══ Resource Description ═══
+\begin{frame}{Resource Description}
+\begin{columns}[T]
+\begin{column}{0.55\textwidth}
+\begin{itemize}
+\item \textbf{Source}: Electric Arc Furnace (EAF) steel plant
+\item \textbf{Throughput}: \num{100000}~t/yr (303~t/d)
+\item \textbf{Physical form}: Solid slag
+\item \textbf{Operating days}: 330/yr
+\end{itemize}
+\vspace{1em}
+\textbf{Global context:}\\
+$>$50~Mt/yr of EAF slag produced globally\\
+Most currently landfilled
+\end{column}
+\begin{column}{0.40\textwidth}
+\textbf{6 Value streams evaluated:}
+\begin{enumerate}
+\item Iron recovery (LIMS)
+\item H\textsubscript{2} production
+\item CO\textsubscript{2} mineralization
+\item Chromium recovery
+\item Manganese recovery
+\item Vanadium recovery
+\end{enumerate}
+\end{column}
+\end{columns}
+\end{frame}
+
+% ═══ Feed composition ═══
+\begin{frame}{Raw Material Composition}
+\begin{table}
+\centering
+\small
+\begin{tabular}{@{}lccl@{}}
+\toprule
+\textbf{Phase} & \textbf{Mol Frac.} & \textbf{kg/t slag} & \textbf{Value Stream} \\
+\midrule
+FeO            & 0.200 & ---  & $\to$ Fe\textsubscript{3}O\textsubscript{4} (serp.) \\
+CaO            & 0.400 & ---  & $\to$ CaCO\textsubscript{3} (carb.) \\
+MgO            & 0.100 & ---  & $\to$ MgCO\textsubscript{3} (carb.) \\
+SiO\textsubscript{2} & 0.150 & --- & Gangue \\
+Fe\textsubscript{3}O\textsubscript{4} & 0.031 & 103.5 & LIMS \\
+Al\textsubscript{2}O\textsubscript{3} & 0.050 & --- & Gangue \\
+MnO            & 0.040 & 40.9 & Acid leach \\
+Cr\textsubscript{2}O\textsubscript{3} & 0.024 & 52.6 & Acid leach \\
+V\textsubscript{2}O\textsubscript{3} & 0.005 & 10.8 & Acid leach \\
+\bottomrule
+\end{tabular}
+\end{table}
+\framesub{Avg.\ MW: 69.4~g/mol \quad|\quad JAX GEM speciation: pH~2.53, Eh~0.105~V}
+\end{frame}
+
+% ═══════════════════════════════════════
+\section{Process Design}
+
+% ═══ PFD ═══
+\begin{frame}{Process Flow Diagram --- Optimal Topology}
+\centering
+\begin{tikzpicture}[
+  node distance=0.8cm and 1.1cm,
+  unit/.style={rectangle, draw=StepElectric!60, rounded corners, minimum width=1.6cm,
+               minimum height=0.5cm, align=center, fill=StepElectric!15,
+               text=black, font=\tiny},
+  skip/.style={rectangle, draw=StepGrey!60, rounded corners, dashed, minimum width=1.6cm,
+               minimum height=0.5cm, align=center, fill=StepGrey!10,
+               text=StepGrey!60, font=\tiny},
+  prod/.style={rectangle, draw=StepGreen!60, rounded corners, minimum width=1.4cm,
+               minimum height=0.45cm, align=center, fill=StepGreen!15,
+               text=black, font=\tiny\bfseries},
+  feed/.style={rectangle, draw=StepOrange!60, rounded corners, minimum width=1.4cm,
+               minimum height=0.45cm, align=center, fill=StepOrange!15,
+               text=black, font=\tiny},
+  reag/.style={rectangle, draw=StepPurple!60, rounded corners, minimum width=1.2cm,
+               minimum height=0.4cm, align=center, fill=StepPurple!15,
+               text=black, font=\tiny},
+  stream/.style={-{Stealth[length=2mm]}, thick, white},
+  rin/.style={-{Stealth[length=1.5mm]}, thin, StepPurple!60, dashed},
+]
+% Feed → LIMS (on dry slag, before mixer)
+\node[feed] (slag) {Slag 303~t/d};
+\node[unit, right=of slag] (lims) {LIMS};
+\node[prod, above=0.4cm of lims] (fe) {Fe\textsubscript{3}O\textsubscript{4}};
+\node[unit, right=of lims] (mix) {Mixer};
+\node[unit, right=of mix] (pump) {Pump};
+
+% Water input
+\node[reag, above=0.4cm of mix] (h2o) {H\textsubscript{2}O};
+
+% Bypassed
+\node[skip, below=0.9cm of slag] (serp) {Serp.\ bypass};
+\node[skip, right=of serp] (carb) {Carb.\ bypass};
+
+% Metal recovery
+\node[unit, below=0.9cm of serp] (lcrm) {Leach Cr/Mn};
+\node[unit, right=of lcrm] (pcr) {Precip.\ Cr};
+\node[unit, right=of pcr] (pmn) {Precip.\ Mn};
+\node[prod, above=0.35cm of pcr] (cr) {Cr\textsubscript{2}O\textsubscript{3}};
+\node[prod, above=0.35cm of pmn] (mn) {MnO\textsubscript{2}};
+
+% Reagent inputs for Cr/Mn row
+\node[reag, left=0.6cm of lcrm] (hcl1) {HCl};
+\node[reag, above=0.35cm of pmn, xshift=1.2cm] (naoh1) {NaOH};
+
+% V recovery
+\node[unit, below=0.9cm of lcrm] (lv) {Leach V};
+\node[unit, right=of lv] (pv) {Precip.\ V};
+\node[prod, below=0.35cm of pv] (v) {V\textsubscript{2}O\textsubscript{5}};
+
+% Reagent inputs for V row
+\node[reag, left=0.6cm of lv] (hcl2) {HCl};
+\node[reag, above=0.35cm of pv, xshift=1.2cm] (nh4cl) {NH\textsubscript{4}Cl};
+
+% Process streams
+\draw[stream] (slag) -- (lims);
+\draw[stream] (lims) -- (fe);
+\draw[stream] (lims) -- (mix);
+\draw[stream] (mix) -- (pump);
+\draw[stream] (pump.south) -- ++(0,-0.25) -| (lcrm.north);
+\draw[stream] (lcrm) -- (pcr);
+\draw[stream] (pcr) -- (cr);
+\draw[stream] (pcr) -- (pmn);
+\draw[stream] (pmn) -- (mn);
+\draw[stream] (lcrm.south) -- ++(0,-0.15) -| (lv.north);
+\draw[stream] (lv) -- (pv);
+\draw[stream] (pv) -- (v);
+
+% Reagent input arrows
+\draw[rin] (h2o) -- (mix);
+\draw[rin] (hcl1) -- (lcrm);
+\draw[rin] (naoh1.south) -- ++(0,-0.15) -| (pcr.north east);
+\draw[rin] (naoh1.south) -- ++(0,-0.15) -| (pmn.north east);
+\draw[rin] (hcl2) -- (lv);
+\draw[rin] (nh4cl.south) -- ++(0,-0.15) -| (pv.north east);
+\end{tikzpicture}
+\framesub{LIMS on dry slag (magnetite only) $\to$ mixer $\to$ acid leach circuits.
+Dashed = bypassed by GDP; purple = reagent inputs}
+\end{frame}
+
+% ═══ Key reactions ═══
+\begin{frame}{Key Process Reactions (Equilibrium)}
+\textbf{Cr Acid Leach} (80\textdegree C, 2~hr --- Gibbs minimization):
+\[
+\text{Cr}_2\text{O}_3 + 6\,\text{HCl} \to 2\,\text{CrCl}_3 + 3\,\text{H}_2\text{O}
+\]
+\centering \textit{Equilibrium: 99.4\% dissolution (Eskolaite)}
+
+\textbf{Selective Cr Precipitation} (NaOH, pH 8.5):
+\begin{itemize}
+\item Eskolaite (Cr\textsubscript{2}O\textsubscript{3}) --- \textbf{99.9\% recovery at equilibrium}
+\item Mn precipitation: \textcolor{StepRed}{zero extent} (Bixbyite/Manganosite infeasible at 50\textdegree C)
+\end{itemize}
+
+\textbf{V Recovery}: \textcolor{StepRed}{Not feasible} --- no V solid phases in SUPCRTBL database
+\end{frame}
+
+% ═══ Modeling ═══
+\begin{frame}{Modeling Methodology}
+\begin{table}
+\centering
+\begin{tabular}{@{}lll@{}}
+\toprule
+\textbf{Tier} & \textbf{Tool} & \textbf{Purpose} \\
+\midrule
+1 & JAX GEM (SUPCRTBL/HKF) & Differentiable speciation \\
+2 & IDAES-PSE + Pyomo & GDP superstructure \\
+3 & JAX TEA + BoTorch & Cost optimization \\
+\bottomrule
+\end{tabular}
+\end{table}
+\vspace{1em}
+\centering
+\textbf{6 GDP disjunctions} $\times$ binary $=$ \textbf{64 topologies}\\[0.5em]
+18 continuous design variables (BoTorch)
+\end{frame}
+
+% ═══════════════════════════════════════
+\section{GDP Analysis}
+
+% ═══ Superstructure ═══
+\begin{frame}{GDP Disjunctions}
+\begin{table}
+\centering
+\begin{tabular}{@{}llc@{}}
+\toprule
+\textbf{Disjunction} & \textbf{Choices} & \textbf{Optimal} \\
+\midrule
+LIMS position        & LIMS / bypass       & \textcolor{StepGreen}{LIMS}  \\
+Heat strategy        & Aux heater / recovery & recovery \\
+H\textsubscript{2} production & Reactor / \textcolor{StepRed}{bypass} & \textcolor{StepRed}{bypass} \\
+CO\textsubscript{2} mineral.  & Reactor / \textcolor{StepRed}{bypass} & \textcolor{StepRed}{bypass} \\
+Cr recovery          & \textcolor{StepGreen}{Leach} / bypass & \textcolor{StepGreen}{leach} \\
+Mn/V recovery        & Leach / \textcolor{StepRed}{bypass} & \textcolor{StepRed}{bypass} \\
+\bottomrule
+\end{tabular}
+\end{table}
+\framesub{Equilibrium: Mn precip. infeasible, V not in database --- GDP excludes both}
+\end{frame}
+
+% ═══ Trade study ═══
+\begin{frame}{Topology Ranking}
+\begin{table}
+\centering
+\small
+\begin{tabular}{@{}lccccc@{}}
+\toprule
+\textbf{Topology} & \textbf{Margin/t} & \textbf{CAPEX} & \textbf{NPV} & \textbf{IRR} & \textbf{PB} \\
+& (USD) & (M\,USD) & (M\,USD) & (\%) & (yr) \\
+\midrule
+\textbf{T1: LIMS+Cr leach/precip} & \textbf{461} & \textbf{25} & \textbf{428} & \textbf{184} & \textbf{0.5} \\
+T2: Cr leach/precip only  & 452 & 22 & 423 & 206 & 0.5 \\
+T3: LIMS+Cr+CO\textsubscript{2}          & 474 & 40 & 425 & 119 & 0.8 \\
+T4: Full (all circuits)   & 404 & 70 & 326 &  58 & 1.7 \\
+T5: LIMS only             &   8 & 12 &  66 &  67 & 1.5 \\
+\bottomrule
+\end{tabular}
+\end{table}
+\framesub{All 512 topologies enumerated via equilibrium reactors; top 5 shown}
+\end{frame}
+
+% ═══════════════════════════════════════
+\section{Results}
+
+% ═══ Revenue breakdown ═══
+\begin{frame}{Revenue Breakdown --- Optimal Topology (T1)}
+\begin{columns}[T]
+\begin{column}{0.55\textwidth}
+\begin{table}
+\centering
+\begin{tabular}{@{}lcc@{}}
+\toprule
+\textbf{Product} & \textbf{t/yr} & \textbf{M\,USD/yr} \\
+\midrule
+Cr\textsubscript{2}O\textsubscript{3} (Eskolaite) & \num{5220} & \textcolor{StepGreen}{47.0} \\
+Fe\textsubscript{3}O\textsubscript{4} & \num{8800} & \textcolor{StepGreen}{1.1} \\
+\midrule
+\textbf{Total} & & \textbf{\textcolor{StepGreen}{48.0}} \\
+\bottomrule
+\end{tabular}
+\end{table}
+\end{column}
+\begin{column}{0.40\textwidth}
+\textbf{Revenue share:}\\[0.5em]
+Cr\textsubscript{2}O\textsubscript{3} = \textbf{98\%}\\
+Fe\textsubscript{3}O\textsubscript{4} = 2\%\\[1em]
+\textcolor{StepRed}{\textbf{OPEX:} \$2.0M/yr}\\[0.5em]
+\textcolor{StepGrey}{T1 excludes CO\textsubscript{2} carbonation}
+\end{column}
+\end{columns}
+\end{frame}
+
+% ═══ Big Number Slide ═══
+\begin{frame}{Levelized Net Value}
+\centering
+{\Large\textbf{\textcolor{StepGreen}{\$436/t}} levelized net value of production}\\[4pt]
+\begin{tikzpicture}[y=0.008cm]
+  \pgfmathsetmacro{\bw}{0.50}
+  % Revenue bars
+  \fill[StepGreen!70] (1-\bw,0) rectangle (1+\bw,470);
+  \node[above, font=\tiny, text=white] at (1,470) {+470};
+  \node[below, font=\tiny, text=white] at (1,-15) {Cr\textsubscript{2}O\textsubscript{3}};
+
+  \fill[StepGreen!35] (2.2-\bw,470) rectangle (2.2+\bw,481);
+  \node[above, font=\tiny, text=white] at (2.2,481) {+11};
+  \node[below, font=\tiny, text=white] at (2.2,-15) {Fe\textsubscript{3}O\textsubscript{4}};
+
+  % Cost bars
+  \fill[StepRed!70] (3.6-\bw,461) rectangle (3.6+\bw,481);
+  \node[right, font=\tiny, text=white] at (3.6+\bw,471) {\textminus20};
+  \node[below, font=\tiny, text=white] at (3.6,-15) {OPEX};
+
+  \fill[StepRed!50] (5.0-\bw,436) rectangle (5.0+\bw,461);
+  \node[right, font=\tiny, text=white] at (5.0+\bw,449) {\textminus25};
+  \node[below, font=\tiny, text=white] at (5.0,-15) {EAC};
+
+  % Net value
+  \fill[StepElectric] (6.6-\bw,0) rectangle (6.6+\bw,436);
+  \node[above, font=\scriptsize\bfseries, text=white] at (6.6,436) {436};
+  \node[below, font=\tiny\bfseries, text=white] at (6.6,-15) {Net Value};
+
+  % Y-axis
+  \draw[StepGrey!50, ->] (0,0) -- (0,540) node[above, font=\tiny, text=white] {USD/t};
+  \foreach \y in {0,100,200,300,400,500} {
+    \draw[StepGrey!40] (0,\y) -- (-0.1,\y) node[left, font=\tiny, text=StepGrey] {\y};
+  }
+  \draw[StepGrey!30] (0,0) -- (7.5,0);
+  % Connectors
+  \draw[StepGrey!30, thin, dashed] (1+\bw,470) -- (2.2-\bw,470);
+  \draw[StepGrey!30, thin, dashed] (2.2+\bw,481) -- (3.6-\bw,481);
+  \draw[StepGrey!30, thin, dashed] (3.6+\bw,461) -- (5.0-\bw,461);
+\end{tikzpicture}
+\end{frame}
+
+% ═══ Assumptions ═══
+\begin{frame}{Key Economic Assumptions}
+\begin{columns}[T]
+\begin{column}{0.48\textwidth}
+\textbf{Plant parameters:}
+\begin{itemize}
+\item Throughput: \num{100000}~t/yr
+\item Operating days: 330/yr
+\item Discount rate: 8\%
+\item Project life: 20~yr
+\item CAPEX: \$25M
+\end{itemize}
+\end{column}
+\begin{column}{0.48\textwidth}
+\textbf{Commodity prices:}
+\begin{itemize}
+\item Cr\textsubscript{2}O\textsubscript{3}: \$\num{9000}/t
+\item Fe\textsubscript{3}O\textsubscript{4}: \$120/t
+\item CO\textsubscript{2} credit: \$60/t
+\end{itemize}
+\end{column}
+\end{columns}
+\end{frame}
+
+% ═══════════════════════════════════════
+\section{Sensitivity}
+
+% ═══ Sensitivity ═══
+\begin{frame}{NPV Tornado Chart ($\pm$30\%, one-at-a-time)}
+\centering
+\begin{tikzpicture}[x=0.85cm, y=0.5cm]
+  % Grid
+  \draw[StepGrey!30, thin] (0,-0.3) -- (0,-7.5);
+  \foreach \x in {-3,-2,-1,1,2,3} {
+    \draw[StepGrey!10, thin] (\x,-0.3) -- (\x,-7.5);
+  }
+  \foreach \x/\lab in {-3/$-$120, -2/$-$80, -1/$-$40, 0/0, 1/$+$40, 2/$+$80, 3/$+$120} {
+    \node[below, font=\tiny, text=StepGrey] at (\x,-7.7) {\lab};
+  }
+  \node[below, font=\scriptsize, text=white] at (0,-8.4) {NPV deviation (M\,USD)};
+
+  % 1. Cr2O3 price: swing ±117
+  \fill[StepRed] (0,-1) rectangle (-2.925,-1.45);
+  \fill[StepGreen!80] (0,-1) rectangle (2.925,-1.45);
+  \node[left, font=\tiny, text=white] at (-2.975,-1.225) {329\,M};
+  \node[right, font=\tiny, text=white] at (2.975,-1.225) {563\,M};
+  \node[left, font=\scriptsize, text=white, text width=5cm, align=right] at (-4.8,-1.225)
+    {Cr\textsubscript{2}O\textsubscript{3} price (\$9,000/t)};
+
+  % 2. Cr leach recovery: asymmetric
+  \fill[StepRed] (0,-2) rectangle (-2.925,-2.45);
+  \fill[StepGreen!80] (0,-2) rectangle (0.15,-2.45);
+  \node[left, font=\tiny, text=white] at (-2.975,-2.225) {329\,M};
+  \node[right, font=\tiny, text=white] at (0.20,-2.225) {452\,M};
+  \node[left, font=\scriptsize, text=white, text width=5cm, align=right] at (-4.8,-2.225)
+    {Cr leach recovery (99.4\%)};
+
+  % 3. Discount rate: inverted
+  \fill[StepGreen!80] (0,-3) rectangle (2.125,-3.45);
+  \fill[StepRed] (0,-3) rectangle (-1.5,-3.45);
+  \node[left, font=\tiny, text=white] at (-1.55,-3.225) {386\,M};
+  \node[right, font=\tiny, text=white] at (2.175,-3.225) {531\,M};
+  \node[left, font=\scriptsize, text=white, text width=5cm, align=right] at (-4.8,-3.225)
+    {Discount rate (8\%)};
+
+  % 4. CO2 credit: swing ±5
+  \fill[StepRed] (0,-4) rectangle (-0.125,-4.45);
+  \fill[StepGreen!80] (0,-4) rectangle (0.125,-4.45);
+  \node[left, font=\tiny, text=white] at (-0.175,-4.225) {441\,M};
+  \node[right, font=\tiny, text=white] at (0.175,-4.225) {451\,M};
+  \node[left, font=\scriptsize, text=white, text width=5cm, align=right] at (-4.8,-4.225)
+    {CO\textsubscript{2} credit (\$60/t)};
+
+  % 5. Fe3O4: swing ±3
+  \fill[StepRed] (0,-5) rectangle (-0.075,-5.45);
+  \fill[StepGreen!80] (0,-5) rectangle (0.075,-5.45);
+  \node[left, font=\tiny, text=white] at (-0.125,-5.225) {443\,M};
+  \node[right, font=\tiny, text=white] at (0.125,-5.225) {449\,M};
+  \node[left, font=\scriptsize, text=white, text width=5cm, align=right] at (-4.8,-5.225)
+    {Fe\textsubscript{3}O\textsubscript{4} price (\$120/t)};
+
+  % 6. CAPEX: swing ±7.5 inverted
+  \fill[StepGreen!80] (0,-6) rectangle (0.188,-6.45);
+  \fill[StepRed] (0,-6) rectangle (-0.188,-6.45);
+  \node[left, font=\tiny, text=white] at (-0.238,-6.225) {439\,M};
+  \node[right, font=\tiny, text=white] at (0.238,-6.225) {454\,M};
+  \node[left, font=\scriptsize, text=white, text width=5cm, align=right] at (-4.8,-6.225)
+    {CAPEX (\$25M)};
+
+  % Legend
+  \fill[StepRed] (-2.2,0.2) rectangle (-1.8,0.5);
+  \node[right, font=\tiny, text=white] at (-1.75,0.35) {Adverse ($-$30\%)};
+  \fill[StepGreen!80] (0.2,0.2) rectangle (0.6,0.5);
+  \node[right, font=\tiny, text=white] at (0.65,0.35) {Favorable ($+$30\%)};
+  \draw[white, thick, dashed] (0,-0.3) -- (0,-7.5);
+  \node[above, font=\tiny, text=white] at (0,0.5) {Base: 446\,M\,USD};
+\end{tikzpicture}
+\end{frame}
+
+% ═══ CAPEX Breakdown ═══
+\begin{frame}{CAPEX Breakdown (\$25M)}
+\centering
+\begin{tikzpicture}[x=0.7cm, y=0.7cm]
+  % Bar 1: Cr leach + precipitation — $10M (40%)
+  \fill[StepElectric!80] (0,-1) rectangle (10*0.3,-1.55);
+  \node[right, font=\tiny, text=white] at (10*0.3+0.1,-1.275) {\$10M (40\%)};
+  \node[left, font=\scriptsize, text=white, text width=5cm, align=right] at (-0.1,-1.275)
+    {Cr leach \& precipitation};
+
+  % Bar 2: Feed prep — $4M (16%)
+  \fill[StepGreen!50] (0,-2.1) rectangle (4*0.3,-2.65);
+  \node[right, font=\tiny, text=white] at (4*0.3+0.1,-2.375) {\$4M (16\%)};
+  \node[left, font=\scriptsize, text=white, text width=5cm, align=right] at (-0.1,-2.375)
+    {Feed preparation};
+
+  % Bar 3: Engineering \& contingency — $4.5M (18%)
+  \fill[StepGrey!50] (0,-3.2) rectangle (4.5*0.3,-3.75);
+  \node[right, font=\tiny, text=white] at (4.5*0.3+0.1,-3.475) {\$4.5M (18\%)};
+  \node[left, font=\scriptsize, text=white, text width=5cm, align=right] at (-0.1,-3.475)
+    {Engineering \& contingency};
+
+  % Bar 4: Utilities \& infra — $3.5M (14%)
+  \fill[StepOrange!60] (0,-4.3) rectangle (3.5*0.3,-4.85);
+  \node[right, font=\tiny, text=white] at (3.5*0.3+0.1,-4.475) {\$3.5M (14\%)};
+  \node[left, font=\scriptsize, text=white, text width=5cm, align=right] at (-0.1,-4.475)
+    {Utilities \& infrastructure};
+
+  % Bar 5: LIMS — $3M (12%)
+  \fill[StepGreen!35] (0,-5.4) rectangle (3*0.3,-5.95);
+  \node[right, font=\tiny, text=white] at (3*0.3+0.1,-5.575) {\$3M (12\%)};
+  \node[left, font=\scriptsize, text=white, text width=5cm, align=right] at (-0.1,-5.575)
+    {LIMS magnetic separator};
+
+  % X-axis
+  \draw[StepGrey!30] (0,0) -- (0,-6.5);
+  \foreach \x/\lab in {0/0, 0.6/2, 1.2/4, 1.8/6, 2.4/8, 3.0/10} {
+    \draw[StepGrey!15, thin] (\x,0) -- (\x,-6.5);
+    \node[above, font=\tiny, text=StepGrey] at (\x,0.1) {\lab};
+  }
+  \node[above, font=\scriptsize, text=white] at (1.5,0.5) {M\,USD};
+\end{tikzpicture}
+\framesub{Cr leach/precip dominates (40\%); V/Mn circuits excluded by equilibrium}
+\end{frame}
+
+% ═══ OPEX Breakdown ═══
+\begin{frame}{OPEX Breakdown (\$2.0M/yr $\equiv$ \$20/t)}
+\centering
+\begin{tikzpicture}[x=0.7cm, y=0.7cm]
+  % Bar 1: Labor — $1.43M (71%)
+  \fill[StepElectric!80] (0,-1) rectangle (1.43*2.0,-1.55);
+  \node[right, font=\tiny, text=white] at (1.43*2.0+0.1,-1.275) {\$1.43M (71\%)};
+  \node[left, font=\scriptsize, text=white, text width=5cm, align=right] at (-0.1,-1.275)
+    {Labor --- 4 FTE @ \$45/hr};
+
+  % Bar 2: NaOH — $0.35M (17%)
+  \fill[StepElectric!65] (0,-2.1) rectangle (0.35*2.0,-2.65);
+  \node[right, font=\tiny, text=white] at (0.35*2.0+0.1,-2.375) {\$0.35M (17\%)};
+  \node[left, font=\scriptsize, text=white, text width=5cm, align=right] at (-0.1,-2.375)
+    {NaOH @ \$0.40/kg};
+
+  % Bar 3: HCl — $0.12M (6%)
+  \fill[StepOrange!60] (0,-3.2) rectangle (0.12*2.0,-3.75);
+  \node[right, font=\tiny, text=white] at (0.12*2.0+0.1,-3.475) {\$0.12M (6\%)};
+  \node[left, font=\scriptsize, text=white, text width=5cm, align=right] at (-0.1,-3.475)
+    {HCl @ \$0.15/kg};
+
+  % Bar 4: Maintenance — $0.10M (5%)
+  \fill[StepGreen!35] (0,-4.3) rectangle (0.10*2.0,-4.85);
+  \node[right, font=\tiny, text=white] at (0.10*2.0+0.1,-4.475) {\$0.10M (5\%)};
+  \node[left, font=\scriptsize, text=white, text width=5cm, align=right] at (-0.1,-4.475)
+    {Maintenance --- 2\% of CAPEX};
+
+  % Bar 5: Electricity — $0.04M (2%)
+  \fill[StepGreen!25] (0,-5.4) rectangle (0.04*2.0,-5.95);
+  \node[right, font=\tiny, text=white] at (0.04*2.0+0.1,-5.575) {\$0.04M (2\%)};
+  \node[left, font=\scriptsize, text=white, text width=5cm, align=right] at (-0.1,-5.575)
+    {Electricity @ \$0.08/kWh};
+
+  % X-axis
+  \draw[StepGrey!30] (0,0) -- (0,-6.5);
+  \foreach \x/\lab in {0/0, 0.5/0.25, 1.0/0.5, 1.5/0.75, 2.0/1.0, 2.5/1.25, 3.0/1.5} {
+    \draw[StepGrey!15, thin] (\x,0) -- (\x,-6.5);
+    \node[above, font=\tiny, text=StepGrey] at (\x,0.1) {\lab};
+  }
+  \node[above, font=\scriptsize, text=white] at (1.5,0.5) {M\,USD/yr};
+\end{tikzpicture}
+\framesub{Labor dominates (71\%) --- simplified Cr-only topology minimizes reagent usage}
+\end{frame}
+
+% ═══════════════════════════════════════
+\section{Conclusions}
+
+% ═══ Key Findings ═══
+\begin{frame}{Key Findings (Equilibrium Models)}
+\begin{enumerate}
+\item \textbf{Cr dominates}: Cr\textsubscript{2}O\textsubscript{3}
+      drives 94\% of revenue (\$47.0M/yr) --- Eskolaite precipitation 99.9\% at equilibrium
+\item \textbf{Mn infeasible}: Bixbyite/Manganosite do not precipitate at 50\textdegree C, pH 9.5
+\item \textbf{V absent}: No V-bearing solid phases in SUPCRTBL database
+\item \textbf{H\textsubscript{2} minimal}: Serpentinization converts 0.03\% of Fe\textsubscript{2}SiO\textsubscript{4}
+\item \textbf{Robust}: NPV $>$ \$329M under all $-$30\% scenarios
+\end{enumerate}
+\end{frame}
+
+% ═══ Next Steps ═══
+\begin{frame}{Recommendations}
+\begin{enumerate}
+\item \textbf{Bench-scale testing}: Validate Cr recovery at equilibrium conditions
+\item \textbf{Mn investigation}: Test higher pH/oxidizing conditions for Mn precipitation
+\item \textbf{V database}: Extend SUPCRTBL with V-oxide thermodynamic data
+\item \textbf{Market analysis}: Secure offtake for Cr\textsubscript{2}O\textsubscript{3} product
+\item \textbf{Kinetic validation}: Confirm equilibrium recovery achievable within residence times
+\end{enumerate}
+\end{frame}
+
+% ═══ Closing ═══
+\closingSlide
+
+\end{document}

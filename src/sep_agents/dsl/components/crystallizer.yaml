@@ -1,0 +1,22 @@
+type: crystallizer
+description: >
+  Cooling or evaporative crystallizer for producing solid product crystals.
+  Cooling rate and seed loading control crystal size distribution.
+defaults:
+  T_C: 25.0
+  residence_time_s: 7200.0
+  cooling_rate_K_per_s: 0.01
+  seed_loading_gpl: 5.0
+bounds:
+  T_C: [5.0, 80.0]
+  residence_time_s: [3600.0, 28800.0]
+  cooling_rate_K_per_s: [0.001, 0.1]
+  seed_loading_gpl: [0.5, 50.0]
+required_params:
+  - T_C
+  - residence_time_s
+optional_params:
+  - cooling_rate_K_per_s
+  - seed_loading_gpl
+  - reagent_dosage_gpl
+  - reagent_name

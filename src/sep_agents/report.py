@@ -769,7 +769,7 @@ def generate_gdp_report(
         (report_markdown, output_file_path)
     """
     from .opt.gdp_builder import build_sub_flowsheet
-    from .dsl.ree_superstructures import SUPERSTRUCTURE_REGISTRY
+    from .dsl.yaml_loader import load_superstructure as _load_ss
     from .sim.idaes_adapter import IDAESFlowsheetBuilder
 
     ts = datetime.now()
@@ -827,9 +827,9 @@ def generate_gdp_report(
     states = {}
     best_kpis = {}
 
-    if best and superstructure_name in SUPERSTRUCTURE_REGISTRY:
+    if best and superstructure_name:
         try:
-            ss = SUPERSTRUCTURE_REGISTRY[superstructure_name]()
+            ss = _load_ss(superstructure_name)
             flowsheet = build_sub_flowsheet(ss, best.config)
 
             # Apply optimized params if any

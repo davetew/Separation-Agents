@@ -55,17 +55,23 @@ Build a `Flowsheet` containing the **superset** of all candidate unit operations
 - `mill`, `cyclone` — Comminution / classification
 - `lims` — Magnetic separation
 - `flotation_bank` — Froth flotation
-- `leach_reactor` — Acid/alkaline leaching
-- `precipitator` — Chemical precipitation
+- `equilibrium_reactor` — Gibbs energy minimization reactor (leaching, precipitation, serpentinization, carbonation)
 - `solvent_extraction` — SX with distribution coefficients
 - `ion_exchange` — IX columns
 - `crystallizer` — Product crystallization
 - `thickener` — Solid/liquid separation
 - `mixer` — Stream merging
 - `heat_exchanger`, `pump` — Utilities
-- `carbonation_reactor` — CO₂ mineralization
-- `serpentinization_reactor` — H₂ generation
 - `separator` — Generic split
+
+> [!CAUTION]
+> **All leach and precipitation units MUST use `equilibrium_reactor`** (Gibbs energy minimization) — not the empirical `leach_reactor` or `precipitator` components. Each equilibrium unit must specify:
+> - `aqueous_elements` — list of elements in the aqueous phase
+> - `equilibrium_phases` — mineral/precipitate phases to consider
+> - `database: supcrtbl` — thermodynamic database
+> - `reagent_name` and `reagent_dosage_gpl` — reagent identity and dosage
+>
+> The empirical `leach_reactor` and `precipitator` components are **deprecated** for chemistry prediction. They may only be retained for sizing/costing if needed alongside an equilibrium reactor.
 
 For each unit type, ensure required params are specified per `UNIT_PARAM_SPEC` in `schemas.py`.
 
@@ -133,16 +139,30 @@ Report:
 
 ---
 
-## Step 5: Save New Superstructures to Registry
+## Step 5: Save New Superstructures to Library
 
-If a new superstructure was created in Step 3, persist it for future reuse:
+If a new superstructure was created in Step 3, persist it as a YAML file for future reuse:
 
-1. Create a new Python file or add a factory function to an existing file in `src/sep_agents/dsl/`:
-   - For REE-focused: add to `ree_superstructures.py` and update `SUPERSTRUCTURE_REGISTRY`
-   - For geological (H₂/CO₂): add to `geo_superstructures.py` and update `GEO_SUPERSTRUCTURE_REGISTRY`
-   - For other categories: create a new file (e.g., `brine_superstructures.py`) following the same pattern
-2. The factory function should return a `Superstructure` object
-3. Register it in the appropriate `*_REGISTRY` dict
+1. Save the superstructure to `src/sep_agents/dsl/superstructures/<name>.yaml` following the existing YAML format (see `eaf_steel_slag.yaml` as a template).
+
+2. The YAML file should contain:
+   - `name`, `description`, `objective`
+   - `streams:` — feed and internal streams with composition, T, P
+   - `units:` — all unit operations referencing component types from `dsl/components/`
+   - `disjunctions:` — mutually exclusive unit groups
+   - `fixed_units:` — always-active unit IDs
+   - `continuous_bounds:` — BoTorch design variable bounds
+
+3. Use the `save_superstructure()` helper to persist and auto-update the README:
+   ```python
+   from sep_agents.dsl.yaml_loader import save_superstructure, load_superstructure
+   save_superstructure(yaml_content, name="<name>", overwrite=True)
+   ss = load_superstructure("<name>")
+   print(f"Loaded: {ss.name}, {len(ss.base_flowsheet.units)} units, "
+         f"{len(ss.disjunctions)} disjunctions")
+   ```
+
+   > The `dsl/README.md` is automatically regenerated whenever `save_superstructure()` or `save_raw_material()` is called.
 
 ---
 

@@ -1,0 +1,15 @@
+type: separator
+description: >
+  Generic stream splitter — splits an inlet into two outlets using
+  a recovery/split-fraction model. Used for gas-liquid separation,
+  solid-liquid filtration, or simple stream splitting.
+defaults:
+  recovery: 0.95
+  split_fraction: 0.95
+bounds:
+  recovery: [0.50, 0.99]
+  split_fraction: [0.50, 0.99]
+required_params: []
+optional_params:
+  - recovery
+  - split_fraction
